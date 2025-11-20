@@ -1,0 +1,232 @@
+/* CommunityUpload.css - Additional styles for upload functionality */
+
+/* Button to create post */
+.btn-create-post {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  margin-top: 1rem;
+}
+
+.btn-create-post:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.btn-create-post:active {
+  transform: translateY(0);
+}
+
+/* Upload Modal */
+.upload-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.upload-modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.upload-modal-content h2 {
+  margin: 0 0 1.5rem 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+}
+
+/* File drop zone */
+.file-drop-zone {
+  border: 3px dashed #cbd5e0;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f8f9fa;
+  margin-bottom: 1rem;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.file-drop-zone:hover {
+  border-color: #667eea;
+  background: #f0f4ff;
+}
+
+.drop-zone-placeholder {
+  color: #7f8c8d;
+}
+
+.drop-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.drop-zone-placeholder p {
+  margin: 0.5rem 0;
+}
+
+.drop-hint {
+  font-size: 0.85rem;
+  color: #95a5a6;
+}
+
+.preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.preview-container img,
+.preview-container video {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 8px;
+}
+
+/* Caption input */
+.upload-caption {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 1rem;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.upload-caption:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+/* Upload actions */
+.upload-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-cancel {
+  padding: 0.75rem 1.5rem;
+  background: #e0e0e0;
+  color: #495057;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background: #cbd5e0;
+}
+
+.btn-publish {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-publish:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-publish:disabled,
+.btn-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-publish:active:not(:disabled),
+.btn-cancel:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Responsive for upload modal */
+@media (max-width: 768px) {
+  .upload-modal {
+    padding: 0.5rem;
+  }
+
+  .upload-modal-content {
+    padding: 1.5rem;
+    max-height: 95vh;
+  }
+
+  .file-drop-zone {
+    padding: 1.5rem;
+    min-height: 150px;
+  }
+
+  .drop-icon {
+    font-size: 2.5rem;
+  }
+
+  .upload-actions {
+    flex-direction: column;
+  }
+
+  .btn-cancel,
+  .btn-publish {
+    width: 100%;
+  }
+}
