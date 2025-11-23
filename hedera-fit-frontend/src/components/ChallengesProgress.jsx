@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import './ChallengesProgress.css';
 
-/**
- * CHALLENGES PROGRESS - Affichage des challenges avec progression
- * 
- * FONCTIONNALITÉS:
- * - Liste challenges actifs
- * - Barres de progression animées
- * - Stats utilisateur (complétés/actifs)
- * - Refresh automatique
- */
-
 const ChallengesProgress = ({ token }) => {
-  const [challenges, setChallenges] = useState([]);
+  const [tab, setTab] = useState('daily');
+  const [challenges, setChallenges] = useState({ daily: [], duration: [], social: [] });
   const [progress, setProgress] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
-    // Refresh toutes les 10 secondes
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 10000); // Refresh every 10s
     return () => clearInterval(interval);
   }, [token]);
 
@@ -33,22 +23,24 @@ const ChallengesProgress = ({ token }) => {
       ]);
       setLoading(false);
     } catch (error) {
-      console.error('Erreur fetch data:', error);
+      console.error('Error fetching data:', error);
       setLoading(false);
     }
   };
 
- const fetchChallenges = async () => {
-  const response = await fetch('http://localhost:3000/api/challenges/active', {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  const data = await response.json();
-  if (data.success) {
-    // Nouvelle API retourne { challenges: [...], userLevel: 1, totalCompleted: 0 }
-    const challengesArray = data.data.challenges || data.data || [];
-    setChallenges(challengesArray);
-  }
-};
+  const fetchChallenges = async () => {
+    const response = await fetch('http://localhost:3000/api/challenges/active', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (data.success) {
+      setChallenges({
+        daily: data.data.daily || [],
+        duration: data.data.duration || [],
+        social: data.data.social || []
+      });
+    }
+  };
 
   const fetchProgress = async () => {
     const response = await fetch('http://localhost:3000/api/challenges/my-progress', {
@@ -70,14 +62,7 @@ const ChallengesProgress = ({ token }) => {
     }
   };
 
-  // Combiner challenges et progression
-  const getChallengeProgress = (challengeId) => {
-    return progress.find(p => p.challengeId === challengeId) || {
-      currentProgress: 0,
-      progressPercent: 0,
-      isCompleted: false
-    };
-  };
+  const currentChallenges = challenges[tab] || [];
 
   if (loading) {
     return (
@@ -89,7 +74,7 @@ const ChallengesProgress = ({ token }) => {
 
   return (
     <div className="challenges-progress">
-      {/* Stats en haut */}
+      {/* Stats */}
       {stats && (
         <div className="challenges-stats">
           <div className="stat-box">
@@ -107,35 +92,50 @@ const ChallengesProgress = ({ token }) => {
         </div>
       )}
 
-      {/* Liste des challenges */}
+      {/* Tabs */}
+      <div className="challenges-tabs">
+        <button
+          className={`tab ${tab === 'daily' ? 'active' : ''}`}
+          onClick={() => setTab('daily')}
+        >
+          🏃 Daily Steps
+        </button>
+        <button
+          className={`tab ${tab === 'duration' ? 'active' : ''}`}
+          onClick={() => setTab('duration')}
+        >
+          ⏱️ Duration
+        </button>
+        <button
+          className={`tab ${tab === 'social' ? 'active' : ''}`}
+          onClick={() => setTab('social')}
+        >
+          👥 Social
+        </button>
+      </div>
+
+      {/* Challenges list */}
       <div className="challenges-list">
-        <h2>🎯 Challenges Actifs</h2>
-        
-        {challenges.length === 0 ? (
+        {currentChallenges.length === 0 ? (
           <div className="no-challenges">
-            <p>Aucun challenge actif pour le moment</p>
+            <p>Aucun challenge dans cette catégorie</p>
           </div>
         ) : (
-          challenges.map(challenge => {
-            const prog = getChallengeProgress(challenge.id);
-            return (
-              <ChallengeCard
-                key={challenge.id}
-                challenge={challenge}
-                progress={prog}
-              />
-            );
-          })
+          currentChallenges.map(challenge => (
+            <ChallengeCard
+              key={challenge.id}
+              challenge={challenge}
+            />
+          ))
         )}
       </div>
     </div>
   );
 };
 
-// Carte individuelle de challenge
-const ChallengeCard = ({ challenge, progress }) => {
-  const percent = progress.progressPercent || 0;
-  const isCompleted = progress.isCompleted;
+const ChallengeCard = ({ challenge }) => {
+  const percent = challenge.progressPercent || 0;
+  const isCompleted = challenge.isCompleted;
 
   return (
     <div className={`challenge-card ${isCompleted ? 'completed' : ''}`}>
@@ -150,17 +150,17 @@ const ChallengeCard = ({ challenge, progress }) => {
       </div>
 
       <div className="challenge-description">
-        {challenge.description}
+        {challenge.description || `Complete ${challenge.target.toLocaleString()} ${challenge.type === 'social' ? 'posts' : 'steps'}`}
       </div>
 
       <div className="challenge-progress-section">
         <div className="progress-info">
           <span className="progress-current">
-            {(progress.currentProgress || 0).toLocaleString()}
+            {(challenge.currentProgress || 0).toLocaleString()}
           </span>
           <span className="progress-separator">/</span>
           <span className="progress-target">
-            {challenge.target.toLocaleString()} {challenge.type === 'steps' ? 'pas' : ''}
+            {challenge.target.toLocaleString()} {challenge.type === 'social' ? 'posts' : 'pas'}
           </span>
         </div>
         <div className="progress-percent">{percent}%</div>

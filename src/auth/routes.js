@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 const db = require('../lib/db');
 const hederaService = require('../lib/hedera');
 const activityLogger = require('../lib/activity-logger');
+const cacheSyncService = require('../lib/cache-sync');
+const { encryptPrivateKey } = require('../lib/wallet-encryption');
 
 /**
  * POST /auth/register - Créer un nouveau compte + Wallet Hedera
@@ -46,6 +48,7 @@ router.post('/register', async (req, res) => {
 
     // ✅ NOUVEAU: Créer un wallet Hedera pour l'utilisateur
     let hederaAccountId = null;
+    let hederaPrivateKeyEncrypted = null;
     let walletCreated = false;
     
     try {
@@ -56,8 +59,13 @@ router.post('/register', async (req, res) => {
       console.log('🔑 Création du wallet Hedera pour le nouvel utilisateur...');
       const newAccount = await hederaService.createAccount();
       hederaAccountId = newAccount.accountId.toString();
+      
+      // 🔐 Encrypt and store private key
+      hederaPrivateKeyEncrypted = encryptPrivateKey(newAccount.privateKey.toString());
+      
       walletCreated = true;
       console.log(`✅ Wallet créé: ${hederaAccountId}`);
+      console.log(`🔐 Private key encrypted and stored`);
       
       // ✅ Associer automatiquement le FIT Token
       try {
@@ -86,8 +94,8 @@ router.post('/register', async (req, res) => {
 
     // Créer l'utilisateur
     const result = await db.run(
-      'INSERT INTO users (name, email, password, hederaAccountId) VALUES (?, ?, ?, ?)',
-      [name, email, hashedPassword, hederaAccountId]
+      'INSERT INTO users (name, email, password, hederaAccountId, hederaPrivateKeyEncrypted) VALUES (?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, hederaAccountId, hederaPrivateKeyEncrypted]
     );
 
     const userId = result.lastID;
@@ -191,6 +199,22 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Sync user data on login
+    if (user.hederaAccountId) {
+      console.log(`🔄 Syncing user ${user.id} data from blockchain...`);
+      try {
+        await cacheSyncService.syncUser({
+          id: user.id,
+          hederaAccountId: user.hederaAccountId
+        });
+        console.log(`✅ User ${user.id} synced`);
+      } catch (error) {
+        console.error(`⚠️ Sync failed for user ${user.id}:`, error.message);
+        // Don't block login on sync failure
+      }
+    }
+
+    
     res.json({
       success: true,
       message: 'Connexion réussie',
@@ -334,6 +358,9 @@ router.post('/create-wallet', async (req, res) => {
     console.log(`🔑 Création du wallet Hedera pour user ${decoded.id}...`);
     const newAccount = await hederaService.createAccount();
     const hederaAccountId = newAccount.accountId.toString();
+    
+    // 🔐 Encrypt and store private key
+    const hederaPrivateKeyEncrypted = encryptPrivateKey(newAccount.privateKey.toString());
 
     // ✅ Associer automatiquement le FIT Token
     try {
@@ -355,8 +382,8 @@ router.post('/create-wallet', async (req, res) => {
 
     // Mettre à jour en DB
     await db.run(
-      'UPDATE users SET hederaAccountId = ? WHERE id = ?',
-      [hederaAccountId, decoded.id]
+      'UPDATE users SET hederaAccountId = ?, hederaPrivateKeyEncrypted = ? WHERE id = ?',
+      [hederaAccountId, hederaPrivateKeyEncrypted, decoded.id]
     );
 
     // Logger sur la blockchain

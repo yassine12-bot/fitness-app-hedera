@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../lib/db');
 const authMiddleware = require('../../auth/middleware');
+const fitnessContract = require('../../lib/fitness-contract');
+const cacheSync = require('../../lib/cache-sync');
 
 /**
  * POST /api/workouts/steps
- * Enregistrer manuellement des pas (sans smart shoe)
+ * Enregistrer manuellement des pas (avec smart contract)
+ * 
+ * MODIFIÉ: Appelle FitnessContract au lieu d'écrire directement dans SQLite
+ * Cache sync automatique via cache-sync.js
  */
 router.post('/steps', authMiddleware, async (req, res) => {
   try {
@@ -18,36 +23,66 @@ router.post('/steps', authMiddleware, async (req, res) => {
       });
     }
 
-    // Enregistrer l'activité
-    const result = await db.run(`
-      INSERT INTO workouts (
-        userId,
-        steps,
-        distance,
-        calories,
-        workoutDate,
-        createdAt
-      ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `, [req.user.id, steps, distance || 0, calories || 0]);
-
-    // Mettre à jour le total
-    await db.run(
-      'UPDATE users SET totalSteps = totalSteps + ? WHERE id = ?',
-      [steps, req.user.id]
+    // ====================================================
+    // NOUVEAU: Récupérer le compte Hedera de l'utilisateur
+    // ====================================================
+    const user = await db.get(
+      'SELECT hederaAccountId FROM users WHERE id = ?',
+      [req.user.id]
     );
 
+    if (!user.hederaAccountId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aucun wallet Hedera associé. Créez un wallet d\'abord.'
+      });
+    }
+
+    // ====================================================
+    // NOUVEAU: Appeler le smart contract
+    // ====================================================
+    console.log(`📊 Calling FitnessContract.updateSteps(${user.hederaAccountId}, ${steps})`);
+    
+    const contractResult = await fitnessContract.updateSteps(
+      user.hederaAccountId,
+      steps
+    );
+
+    if (!contractResult.success) {
+      throw new Error('Contract call failed');
+    }
+
+    console.log(`✅ Contract updated! TX: ${contractResult.transactionId}`);
+
+    // ====================================================
+    // NOUVEAU: Cache sync manuel (au lieu d'attendre listener)
+    // ====================================================
+    await cacheSync.onWorkoutLogged(
+      req.user.id,
+      user.hederaAccountId,
+      steps,
+      contractResult.transactionId
+    );
+
+    // ====================================================
+    // Réponse (format identique pour compatibilité frontend)
+    // ====================================================
     res.status(201).json({
       success: true,
-      message: 'Activité enregistrée!',
+      message: 'Activité enregistrée on-chain! 🎉',
       data: {
-        workoutId: result.lastID,
         steps,
-        distance,
-        calories
+        distance: distance || 0,
+        calories: calories || 0,
+        blockchain: {
+          transactionId: contractResult.transactionId,
+          explorerUrl: `https://hashscan.io/testnet/transaction/${contractResult.transactionId}`
+        }
       }
     });
 
   } catch (error) {
+    console.error('❌ Error recording workout:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur lors de l\'enregistrement',
@@ -59,6 +94,8 @@ router.post('/steps', authMiddleware, async (req, res) => {
 /**
  * GET /api/workouts/history
  * Historique des workouts
+ * 
+ * INCHANGÉ: Lit depuis cache SQLite
  */
 router.get('/history', authMiddleware, async (req, res) => {
   try {
@@ -103,6 +140,8 @@ router.get('/history', authMiddleware, async (req, res) => {
 /**
  * GET /api/workouts/today
  * Statistiques du jour
+ * 
+ * INCHANGÉ: Lit depuis cache SQLite
  */
 router.get('/today', authMiddleware, async (req, res) => {
   try {

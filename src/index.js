@@ -60,7 +60,11 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    message: 'Hedera Fit API is running! 🚀'
+    message: 'Hedera Fit API is running! 🚀',
+    blockchain: {
+      fitnessContract: process.env.FITNESS_CONTRACT_ADDRESS || 'Not deployed',
+      marketplaceContract: process.env.MARKETPLACE_CONTRACT_ADDRESS || 'Not deployed'
+    }
   });
 });
 
@@ -123,24 +127,65 @@ async function startServer() {
     console.log('');
     await topicCache.initialize();
     
-    // ✨ NOUVEAU: Initialiser le Activity Logger
+    // ✨ Initialiser le Activity Logger
     console.log('');
     console.log('📝 Initialisation du Activity Logger...');
     const activityLogger = require('./lib/activity-logger');
     await activityLogger.initialize();
     console.log('');
     
+    // ====================================================
+    // ✨ NOUVEAU: Initialiser les Smart Contracts
+    // ====================================================
+    console.log('📜 Initialisation des Smart Contracts...');
+    console.log('');
+    
+    const fitnessContract = require('./lib/fitness-contract');
+    const fitnessInitialized = await fitnessContract.initialize();
+    
+    const marketplaceContract = require('./lib/marketplace-contract');
+    const marketplaceInitialized = await marketplaceContract.initialize();
+    
+    if (!fitnessInitialized || !marketplaceInitialized) {
+      console.warn('');
+      console.warn('⚠️  ATTENTION: Les smart contracts ne sont pas configurés!');
+      console.warn('   → Exécutez: npm run deploy');
+      console.warn('   → Cela va déployer FitnessContract et MarketplaceContract');
+      console.warn('');
+    }
+    
+    // ====================================================
+    // ✨ NOUVEAU: Démarrer le Cache Sync Service
+    // ====================================================
+    if (fitnessInitialized && marketplaceInitialized) {
+      console.log('🔄 Démarrage du Cache Sync Service...');
+      const cacheSync = require('./lib/cache-sync');
+      await cacheSync.start();
+      console.log('');
+    }
+    
     // Démarrer le serveur
     app.listen(PORT, () => {
       console.log('');
-      console.log('='.repeat(50));
+      console.log('='.repeat(60));
       console.log('🚀 Serveur démarré avec succès!');
-      console.log('='.repeat(50));
+      console.log('='.repeat(60));
       console.log(`📍 URL: http://localhost:${PORT}`);  
       console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🤖 IA: ${process.env.HUGGINGFACE_API_KEY ? 'Activée ✅' : 'Désactivée ❌'}`);
       console.log(`📊 Cache Topic: ${topicCache.messages.length} messages`);
-      console.log('='.repeat(50));
+      
+      // Afficher l'état des contracts
+      if (fitnessInitialized && marketplaceInitialized) {
+        console.log(`📜 Smart Contracts: Activés ✅`);
+        console.log(`   → FitnessContract: ${process.env.FITNESS_CONTRACT_ADDRESS}`);
+        console.log(`   → MarketplaceContract: ${process.env.MARKETPLACE_CONTRACT_ADDRESS}`);
+        console.log(`🔄 Cache Sync: Actif (polling 30s)`);
+      } else {
+        console.log(`📜 Smart Contracts: Non configurés ⚠️ (run: npm run deploy)`);
+      }
+      
+      console.log('='.repeat(60));
       console.log('');
       console.log('📚 Routes disponibles:');
       console.log('  GET  /health');
@@ -152,10 +197,11 @@ async function startServer() {
       console.log('  POST /api/likes');
       console.log('  POST /api/topics');
       console.log('  POST /api/shoes/sync');
-      console.log('  POST /api/workouts/steps');
+      console.log('  POST /api/workouts/steps          ← Smart Contract');
       console.log('  POST /api/rewards/encouragement');
       console.log('  GET  /api/registries');
       console.log('  GET  /api/marketplace/products');
+      console.log('  POST /api/marketplace/purchase    ← Smart Contract');
       console.log('  GET  /api/challenges/active');
       console.log('');
       console.log('👉 Teste avec: curl http://localhost:' + PORT + '/health');

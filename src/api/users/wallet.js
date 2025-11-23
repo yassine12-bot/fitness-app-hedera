@@ -139,7 +139,7 @@ router.post('/wallet/create', authMiddleware, async (req, res) => {
 
     await activityLogger.logWalletCreated(
   req.user.id,
-  newAccount.accountId.toString()
+  newAccountId.toString()
 );
 
     res.status(201).json({

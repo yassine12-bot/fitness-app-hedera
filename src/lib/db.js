@@ -45,18 +45,21 @@ const dbAll = (sql, params = []) => {
 const initDatabase = async () => {
   try {
     // Table users
-    await dbRun(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        wallet TEXT,
-        totalSteps INTEGER DEFAULT 0,
-        fitBalance REAL DEFAULT 0,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+await dbRun(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    wallet TEXT,
+    hederaAccountId TEXT,
+    hederaPrivateKeyEncrypted TEXT,
+    totalSteps INTEGER DEFAULT 0,
+    fitBalance REAL DEFAULT 0,
+    isAdmin INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
 
     // Table posts
     await dbRun(`
@@ -119,6 +122,89 @@ const initDatabase = async () => {
         FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+    // Table products
+await dbRun(`
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT DEFAULT 'general',
+    priceTokens INTEGER NOT NULL,
+    stock INTEGER DEFAULT 0,
+    imageUrl TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Table purchases
+await dbRun(`
+  CREATE TABLE IF NOT EXISTS purchases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    productId INTEGER NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    totalCost INTEGER NOT NULL,
+    qrCode TEXT,
+    isUsed INTEGER DEFAULT 0,
+    usedAt DATETIME,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id),
+    FOREIGN KEY (productId) REFERENCES products(id)
+  )
+`);
+
+// Table challenges
+await dbRun(`
+  CREATE TABLE IF NOT EXISTS challenges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL,
+    target INTEGER NOT NULL,
+    reward INTEGER NOT NULL,
+    level INTEGER DEFAULT 0,
+    isActive INTEGER DEFAULT 1,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Table challenge_completions
+await dbRun(`
+  CREATE TABLE IF NOT EXISTS challenge_completions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    challengeId INTEGER NOT NULL,
+    challengeTitle TEXT,
+    challengeLevel INTEGER DEFAULT 0,
+    reward INTEGER NOT NULL,
+    hederaTxId TEXT,
+    completedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id),
+    FOREIGN KEY (challengeId) REFERENCES challenges(id)
+  )
+`);
+
+// Table workouts
+await dbRun(`
+  CREATE TABLE IF NOT EXISTS workouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    steps INTEGER NOT NULL,
+    workoutDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+// Table user_badges
+await dbRun(`
+  CREATE TABLE IF NOT EXISTS user_badges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    badgeId INTEGER NOT NULL,
+    earnedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
 
     // Créer les index pour améliorer les performances
     await dbRun('CREATE INDEX IF NOT EXISTS idx_posts_userId ON posts(userId)');
