@@ -40,7 +40,15 @@ const StepSimulator = ({ token, onStepsAdded }) => {
       const data = await response.json();
       if (data.success) {
         // ✅ FIX: Nouvelle API retourne { challenges: [...], userLevel: 1 }
-        const challengesArray = data.data.challenges || data.data || [];
+        // ✅ FIX: Ensure challengesArray is always an array
+        let challengesArray = [];
+        if (data.data) {
+          if (Array.isArray(data.data)) {
+            challengesArray = data.data;
+          } else if (data.data.challenges && Array.isArray(data.data.challenges)) {
+            challengesArray = data.data.challenges;
+          }
+        }
         const stepChallenges = challengesArray.filter(c => 
           c.type === 'daily_steps' || c.type === 'duration_steps'
         );

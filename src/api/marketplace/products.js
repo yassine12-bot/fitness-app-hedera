@@ -33,17 +33,29 @@ router.get('/products', authMiddleware, async (req, res) => {
   try {
     const { category } = req.query;
     
-    let query = 'SELECT * FROM products WHERE stock > 0';
-    let params = [];
+    // Query smart contract for products
+    const productCount = await marketplaceContract.getProductCount();
+    const products = [];
     
-    if (category) {
-      query += ' AND category = ?';
-      params.push(category);
+    for (let i = 1; i <= productCount; i++) {
+      const product = await marketplaceContract.getProduct(i);
+      
+      // Filter: only active products with stock
+      if (product.isActive && product.stock > 0) {
+        // Apply category filter if specified
+        if (!category || product.category === category) {
+          products.push(product);
+        }
+      }
     }
     
-    query += ' ORDER BY category, priceTokens ASC';
-    
-    const products = await db.all(query, params);
+    // Sort by category and price (same as before)
+    products.sort((a, b) => {
+      if (a.category !== b.category) {
+        return a.category.localeCompare(b.category);
+      }
+      return a.priceTokens - b.priceTokens;
+    });
     
     res.json({
       success: true,

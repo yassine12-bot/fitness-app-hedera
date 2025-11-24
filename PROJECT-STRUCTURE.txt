@@ -1,0 +1,140 @@
+﻿================================================================================
+HEDERA FITNESS APP - BACKEND PROJECT STRUCTURE
+================================================================================
+
+Root Location: C:\Users\labri\OneDrive\Desktop\fitnessapp\hedera-fit-backend
+
+================================================================================
+PROJECT TREE
+================================================================================
+
+hedera-fit-backend/
+
+ node_modules/                    (Dependencies - not tracked)
+
+ src/                             *** MAIN SOURCE CODE ***
+   
+    api/                         API Routes
+       challenges.js             Challenge endpoints
+       challenges/
+          index.js
+      
+       marketplace/
+          products.js           Products + Purchase endpoints
+      
+       community/
+          posts.js
+          comments.js
+          likes.js
+          topics.js
+          badges.js
+      
+       users/
+          wallet.js             Wallet creation
+      
+       workouts/
+          steps.js
+      
+       shoes/
+          sync.js
+          sync1.js
+      
+       rewards/
+          encouragement.js
+      
+       leaderboard/
+          index.js
+      
+       registries/
+          index.js
+      
+       admin/
+          index.js
+          hcs.js
+      
+       ai/
+           commentFilter.js
+   
+    auth/                        Authentication
+       routes.js                 Login/register
+       middleware.js             JWT middleware
+       admin-middleware.js
+   
+    lib/                         Core Libraries
+       fitness-contract.js       FitnessContract wrapper
+       marketplace-contract.js   MarketplaceContract wrapper
+       hedera.js                 Hedera SDK utilities
+       hedera-old.js
+       db.js                     Database connection
+       storage.js
+       ai.js
+       badges-service.js
+       activity-logger.js
+       hcs-reader.js
+       topic-cache.js
+       cache-sync.js
+       wallet-encryption.js
+   
+    scripts/                     Utility Scripts
+       deploy-contracts.js
+       seed-challenges.js
+       test-contracts.js
+       check-balance.js
+       fund-user.js
+       transfer-fit.js
+       update-balance.js
+       check-user-steps.js
+       approve-marketplace.js
+       reset-challenges.js
+       reorganize-challenges.js
+       add-encrypted-key-column.js
+   
+    index.js                      MAIN SERVER FILE
+    index-old.js
+
+ .env                              Environment variables
+ .gitignore
+ package.json                     Dependencies
+ package-lock.json
+ test-integration.js              Integration tests
+ README.md
+
+================================================================================
+KEY FILES FOR CLAUDE
+================================================================================
+
+Essential files to upload (11 files):
+
+1.  src/api/challenges.js
+2.  src/api/marketplace/products.js  (includes purchase endpoint)
+3.  src/api/users/wallet.js
+4.  src/auth/routes.js
+5.  src/auth/middleware.js
+6.  src/lib/fitness-contract.js
+7.  src/lib/marketplace-contract.js
+8.  src/lib/hedera.js
+9.  src/lib/db.js
+10. src/index.js
+11. .env (REDACT private keys!)
+
+================================================================================
+SMART CONTRACTS
+================================================================================
+
+FitnessContract:     0.0.7303410
+MarketplaceContract: 0.0.7303411
+FIT Token:           (in .env)
+
+================================================================================
+BACKEND STATUS
+================================================================================
+
+ Server running on: http://localhost:3000
+ Database: SQLite
+ Network: Hedera Testnet
+ Challenges API: Working (grouped by type)
+ Products API: Working (queries smart contract)
+  Purchase flow: Needs testing
+  Challenge completion: Needs testing
+
+================================================================================

@@ -242,6 +242,67 @@ class FitnessContractService {
     }
   }
 
+  async getChallenge(challengeId) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.client) {
+      throw new Error('FitnessContract service not initialized');
+    }
+
+    try {
+      const params = new ContractFunctionParameters()
+        .addUint256(challengeId);
+
+      const query = new ContractCallQuery()
+        .setContractId(this.contractId)
+        .setGas(100000)
+        .setFunction("getChallenge", params);
+
+      const result = await query.execute(this.client);
+
+      // Parse the Challenge struct
+      return {
+        id: result.getUint256(0).toNumber(),
+        title: result.getString(1),
+        challengeType: result.getString(2),
+        target: result.getUint256(3).toNumber(),
+        reward: result.getUint256(4).toNumber(),
+        level: result.getUint256(5).toNumber(),
+        isActive: result.getBool(6)
+      };
+
+    } catch (error) {
+      console.error('❌ Error querying challenge:', error.message);
+      throw error;
+    }
+  }
+
+  async getChallengeCount() {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.client) {
+      throw new Error('FitnessContract service not initialized');
+    }
+
+    try {
+      const query = new ContractCallQuery()
+        .setContractId(this.contractId)
+        .setGas(100000)
+        .setFunction("challengeCount");
+
+      const result = await query.execute(this.client);
+      return result.getUint256(0).toNumber();
+
+    } catch (error) {
+      console.error('❌ Error querying challenge count:', error.message);
+      return 0;
+    }
+  }
+
   async addChallenge(challenge) {
     if (!this.initialized) {
       await this.initialize();

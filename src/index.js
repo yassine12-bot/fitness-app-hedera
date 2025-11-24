@@ -26,11 +26,11 @@ const authRoutes = require('./auth/routes');
 app.use('/auth', authRoutes);
 
 // Community
-const postsRoutes = require('./api/community/posts');    
+const postsRoutes = require('./api/community/posts');
 const commentsRoutes = require('./api/community/comments');
-const likesRoutes = require('./api/community/likes');    
-const topicsRoutes = require('./api/community/topics');  
-const badgesRoutes = require('./api/community/badges');  
+const likesRoutes = require('./api/community/likes');
+const topicsRoutes = require('./api/community/topics');
+const badgesRoutes = require('./api/community/badges');
 app.use('/api/posts', postsRoutes);
 app.use('/api/comments', commentsRoutes);
 app.use('/api/likes', likesRoutes);
@@ -38,7 +38,7 @@ app.use('/api/topics', topicsRoutes);
 app.use('/api/badges', badgesRoutes);
 
 // Users & Wallet
-const walletRoutes = require('./api/users/wallet');      
+const walletRoutes = require('./api/users/wallet');
 app.use('/api/users', walletRoutes);
 
 // AI - pas de routes, c'est un service
@@ -47,12 +47,16 @@ app.use('/api/users', walletRoutes);
 const encouragementRoutes = require('./api/rewards/encouragement');
 app.use('/api/rewards', encouragementRoutes);
 
+// Challenges
+const challengesRoutes = require('./api/challenges');
+app.use('/api/challenges', challengesRoutes);
+
 // Smart Shoes (IoT)
 const shoesRoutes = require('./api/shoes/sync');
 app.use('/api/shoes', shoesRoutes);
 
 // Workouts
-const workoutsRoutes = require('./api/workouts/steps');  
+const workoutsRoutes = require('./api/workouts/steps');
 app.use('/api/workouts', workoutsRoutes);
 
 // Health check
@@ -72,9 +76,7 @@ app.get('/health', (req, res) => {
 const marketplaceRoutes = require('./api/marketplace/products');
 app.use('/api/marketplace', marketplaceRoutes);
 
-// Challenges
-const challengesRoutes = require('./api/challenges');
-app.use('/api/challenges', challengesRoutes);
+
 
 // Registries (Hedera Topic via Cache)
 const registriesRoutes = require('./api/registries');
@@ -98,7 +100,7 @@ app.use((err, req, res, next) => {
   console.error('❌ Erreur serveur:', err);
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Erreur interne du serveur'  
+    message: err.message || 'Erreur interne du serveur'
   });
 });
 
@@ -107,12 +109,12 @@ async function startServer() {
   try {
     // Initialiser la base de données
     await db.initialize();
-    
+
     // Initialiser Hedera
     console.log('🔗 Initialisation Hedera...');
     const hederaService = require('./lib/hedera');
     await hederaService.initialize();
-    
+
     // Configurer les tokens
     if (process.env.FIT_TOKEN_ID) {
       hederaService.setFitTokenId(process.env.FIT_TOKEN_ID);
@@ -122,30 +124,30 @@ async function startServer() {
       hederaService.setNftTokenId(process.env.NFT_TOKEN_ID);
       console.log(`🏅 NFT Token configuré: ${process.env.NFT_TOKEN_ID}`);
     }
-    
+
     // ✨ Initialiser le cache Topic Hedera
     console.log('');
     await topicCache.initialize();
-    
+
     // ✨ Initialiser le Activity Logger
     console.log('');
     console.log('📝 Initialisation du Activity Logger...');
     const activityLogger = require('./lib/activity-logger');
     await activityLogger.initialize();
     console.log('');
-    
+
     // ====================================================
     // ✨ NOUVEAU: Initialiser les Smart Contracts
     // ====================================================
     console.log('📜 Initialisation des Smart Contracts...');
     console.log('');
-    
+
     const fitnessContract = require('./lib/fitness-contract');
     const fitnessInitialized = await fitnessContract.initialize();
-    
+
     const marketplaceContract = require('./lib/marketplace-contract');
     const marketplaceInitialized = await marketplaceContract.initialize();
-    
+
     if (!fitnessInitialized || !marketplaceInitialized) {
       console.warn('');
       console.warn('⚠️  ATTENTION: Les smart contracts ne sont pas configurés!');
@@ -153,7 +155,7 @@ async function startServer() {
       console.warn('   → Cela va déployer FitnessContract et MarketplaceContract');
       console.warn('');
     }
-    
+
     // ====================================================
     // ✨ NOUVEAU: Démarrer le Cache Sync Service
     // ====================================================
@@ -163,18 +165,18 @@ async function startServer() {
       await cacheSync.start();
       console.log('');
     }
-    
+
     // Démarrer le serveur
     app.listen(PORT, () => {
       console.log('');
       console.log('='.repeat(60));
       console.log('🚀 Serveur démarré avec succès!');
       console.log('='.repeat(60));
-      console.log(`📍 URL: http://localhost:${PORT}`);  
+      console.log(`📍 URL: http://localhost:${PORT}`);
       console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🤖 IA: ${process.env.HUGGINGFACE_API_KEY ? 'Activée ✅' : 'Désactivée ❌'}`);
       console.log(`📊 Cache Topic: ${topicCache.messages.length} messages`);
-      
+
       // Afficher l'état des contracts
       if (fitnessInitialized && marketplaceInitialized) {
         console.log(`📜 Smart Contracts: Activés ✅`);
@@ -184,7 +186,7 @@ async function startServer() {
       } else {
         console.log(`📜 Smart Contracts: Non configurés ⚠️ (run: npm run deploy)`);
       }
-      
+
       console.log('='.repeat(60));
       console.log('');
       console.log('📚 Routes disponibles:');
@@ -208,7 +210,7 @@ async function startServer() {
       console.log('');
     });
   } catch (error) {
-    console.error('❌ Erreur démarrage:', error);       
+    console.error('❌ Erreur démarrage:', error);
     process.exit(1);
   }
 }
