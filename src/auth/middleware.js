@@ -1,11 +1,14 @@
 const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
+  console.log('🔵 AUTH MIDDLEWARE CALLED'); // ✨ ADD
+  console.log('   Headers:', req.headers.authorization); // ✨ ADD
+  
   try {
-    // Récupérer le token du header
     const authHeader = req.headers.authorization;
     
     if (!authHeader) {
+      console.log('❌ No auth header'); // ✨ ADD
       return res.status(401).json({
         success: false,
         message: 'Token d\'authentification manquant',
@@ -13,10 +16,10 @@ const authMiddleware = (req, res, next) => {
       });
     }
 
-    // Format attendu: "Bearer TOKEN"
     const token = authHeader.split(' ')[1];
     
     if (!token) {
+      console.log('❌ No token after split'); // ✨ ADD
       return res.status(401).json({
         success: false,
         message: 'Format de token invalide',
@@ -24,18 +27,22 @@ const authMiddleware = (req, res, next) => {
       });
     }
 
-    // Vérifier le token
+    console.log('🔍 Verifying token...'); // ✨ ADD
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✅ Token decoded:', decoded); // ✨ ADD
     
-    // Ajouter les infos user à la requête
     req.user = {
-      id: decoded.id,
+      id: decoded.id || decoded.userId,
       email: decoded.email,
       name: decoded.name
     };
 
+    console.log('✅ req.user set:', req.user); // ✨ ADD
+
     next();
   } catch (error) {
+    console.error('❌ Auth error:', error.message); // ✨ ADD
+    
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,

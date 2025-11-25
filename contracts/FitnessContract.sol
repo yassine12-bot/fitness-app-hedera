@@ -2,9 +2,8 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title FitnessContract
- * @notice Manages fitness tracking, challenges, and automatic rewards
- * @dev Tracks user steps, validates challenges, distributes FIT token rewards
+ * @title FitnessContract - FIXED VERSION
+ * @notice Adds level system and challenge type filtering
  */
 
 interface IHRC20 {
@@ -13,78 +12,37 @@ interface IHRC20 {
 }
 
 contract FitnessContract {
-    // ====================================================
-    // STATE VARIABLES
-    // ====================================================
-    
     address public owner;
     address public fitTokenAddress;
     IHRC20 public fitToken;
     
-    // User step tracking
+    // User data
     mapping(address => uint256) public totalSteps;
+    mapping(address => uint256) public userLevel; // NEW: Track user level
     
-    // Challenge structure
-    struct Challenge {
-        uint256 id;
-        string title;
-        string challengeType; // "daily_steps", "duration_steps", "social"
-        uint256 target;
-        uint256 reward;
-        uint256 level;
-        bool isActive;
-    }
-    
-    // Challenges storage
-    mapping(uint256 => Challenge) public challenges;
+    // Challenge data
     uint256 public challengeCount;
+    mapping(uint256 => uint256) public challengeTarget;
+    mapping(uint256 => uint256) public challengeReward;
+    mapping(uint256 => uint256) public challengeLevel;
+    mapping(uint256 => uint256) public challengeType; // NEW: 1=daily, 2=duration, 3=social
+    mapping(uint256 => bool) public challengeActive;
     
-    // User challenge progress
+    // User progress
     mapping(address => mapping(uint256 => uint256)) public userChallengeProgress;
     mapping(address => mapping(uint256 => bool)) public challengeCompleted;
     
-    // ====================================================
-    // EVENTS
-    // ====================================================
-    
-    event WorkoutLogged(
-        address indexed user,
-        uint256 steps,
-        uint256 timestamp
-    );
-    
-    event ChallengeCompleted(
-        address indexed user,
-        uint256 indexed challengeId,
-        uint256 reward,
-        uint256 timestamp
-    );
-    
-    event ChallengeAdded(
-        uint256 indexed challengeId,
-        string title,
-        uint256 target,
-        uint256 reward
-    );
-    
-    event RewardDistributed(
-        address indexed user,
-        uint256 amount,
-        string reason
-    );
-    
-    // ====================================================
-    // MODIFIERS
-    // ====================================================
+    // Events
+    event WorkoutLogged(address indexed user, uint256 steps, uint256 timestamp);
+    event ChallengeCompleted(address indexed user, uint256 indexed challengeId, uint256 reward, uint256 timestamp);
+    event ChallengeAdded(uint256 indexed challengeId, uint256 target, uint256 reward, uint256 level, uint256 challengeType);
+    event RewardDistributed(address indexed user, uint256 amount, string reason);
+    event LevelUp(address indexed user, uint256 newLevel); // NEW
     
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this");
+        require(msg.sender == owner, "Only owner");
         _;
     }
-    
-    // ====================================================
-    // CONSTRUCTOR
-    // ====================================================
     
     constructor(address _fitTokenAddress) {
         owner = msg.sender;
@@ -92,52 +50,42 @@ contract FitnessContract {
         fitToken = IHRC20(_fitTokenAddress);
     }
     
-    // ====================================================
-    // CORE FUNCTIONS
-    // ====================================================
-    
     /**
-     * @notice Update user steps and check challenge progress
-     * @param user User address
-     * @param steps Number of steps to add
+     * Update user steps - FIXED to filter by level and type
      */
     function updateSteps(address user, uint256 steps) external {
         require(steps > 0, "Steps must be positive");
         
-        // Update total steps
         totalSteps[user] += steps;
-        
-        // Emit workout event
         emit WorkoutLogged(user, steps, block.timestamp);
         
-        // Check all active challenges for this user
         _checkAndCompleteChallenges(user, steps);
     }
     
     /**
-     * @notice Internal function to check and complete challenges
-     * @param user User address
-     * @param newSteps Steps just added
+     * FIXED: Only check challenges at user's level and only step-based challenges
      */
     function _checkAndCompleteChallenges(address user, uint256 newSteps) internal {
+        uint256 currentLevel = userLevel[user];
+        if (currentLevel == 0) currentLevel = 1; // Start at level 1
+        
         for (uint256 i = 1; i <= challengeCount; i++) {
-            Challenge memory challenge = challenges[i];
-            
-            // Skip if challenge not active or already completed
-            if (!challenge.isActive || challengeCompleted[user][i]) {
+            // Skip if not at user's current level
+            if (challengeLevel[i] != currentLevel) {
                 continue;
             }
             
-            // Only check step-based challenges
-            if (
-                keccak256(bytes(challenge.challengeType)) == keccak256(bytes("daily_steps")) ||
-                keccak256(bytes(challenge.challengeType)) == keccak256(bytes("duration_steps"))
-            ) {
-                // Update progress
+            // Skip if not active or already completed
+            if (!challengeActive[i] || challengeCompleted[user][i]) {
+                continue;
+            }
+            
+            // ONLY add steps to step-based challenges (1=daily, 2=duration)
+            // Social challenges (3) are NOT updated here
+            if (challengeType[i] == 1 || challengeType[i] == 2) {
                 userChallengeProgress[user][i] += newSteps;
                 
-                // Check if challenge completed
-                if (userChallengeProgress[user][i] >= challenge.target) {
+                if (userChallengeProgress[user][i] >= challengeTarget[i]) {
                     _completeChallenge(user, i);
                 }
             }
@@ -145,140 +93,123 @@ contract FitnessContract {
     }
     
     /**
-     * @notice Complete a challenge and distribute reward
-     * @param user User address
-     * @param challengeId Challenge ID
+     * Complete a challenge and check for level up
      */
     function _completeChallenge(address user, uint256 challengeId) internal {
-        Challenge memory challenge = challenges[challengeId];
-        
-        // Mark as completed
         challengeCompleted[user][challengeId] = true;
         
-        // Transfer reward (if contract has balance)
-        if (fitToken.balanceOf(address(this)) >= challenge.reward) {
-            fitToken.transfer(user, challenge.reward);
-            emit RewardDistributed(user, challenge.reward, "Challenge completed");
+        uint256 reward = challengeReward[challengeId];
+        
+        if (fitToken.balanceOf(address(this)) >= reward) {
+            fitToken.transfer(user, reward);
+            emit RewardDistributed(user, reward, "Challenge completed");
         }
         
-        // Emit challenge completed event
-        emit ChallengeCompleted(
-            user,
-            challengeId,
-            challenge.reward,
-            block.timestamp
-        );
+        emit ChallengeCompleted(user, challengeId, reward, block.timestamp);
+        
+        // Check if all challenges at this level are complete
+        uint256 level = challengeLevel[challengeId];
+        if (_isLevelComplete(user, level)) {
+            userLevel[user] = level + 1;
+            emit LevelUp(user, level + 1);
+        }
     }
     
-    // ====================================================
-    // ADMIN FUNCTIONS
-    // ====================================================
+    /**
+     * Check if all challenges at a level are complete
+     */
+    function _isLevelComplete(address user, uint256 level) internal view returns (bool) {
+        for (uint256 i = 1; i <= challengeCount; i++) {
+            if (challengeLevel[i] == level) {
+                if (!challengeCompleted[user][i]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
     
     /**
-     * @notice Add a new challenge
-     * @param title Challenge title
-     * @param challengeType Type of challenge
-     * @param target Target value (steps)
-     * @param reward Reward in FIT tokens
-     * @param level Challenge level
+     * NEW: Manually complete social challenge
+     */
+    function completeSocialChallenge(address user, uint256 challengeId) external onlyOwner {
+        require(challengeType[challengeId] == 3, "Not a social challenge");
+        require(challengeLevel[challengeId] == userLevel[user] || (userLevel[user] == 0 && challengeLevel[challengeId] == 1), "Challenge not at user level");
+        require(!challengeCompleted[user][challengeId], "Already completed");
+        
+        userChallengeProgress[user][challengeId] = challengeTarget[challengeId];
+        _completeChallenge(user, challengeId);
+    }
+    
+    /**
+     * Add challenge - NEW: includes challengeType
      */
     function addChallenge(
-        string memory title,
-        string memory challengeType,
         uint256 target,
         uint256 reward,
-        uint256 level
+        uint256 level,
+        uint256 cType // 1=daily, 2=duration, 3=social
     ) external onlyOwner {
+        require(cType >= 1 && cType <= 3, "Invalid challenge type");
+        
         challengeCount++;
+        challengeTarget[challengeCount] = target;
+        challengeReward[challengeCount] = reward;
+        challengeLevel[challengeCount] = level;
+        challengeType[challengeCount] = cType;
+        challengeActive[challengeCount] = true;
         
-        challenges[challengeCount] = Challenge({
-            id: challengeCount,
-            title: title,
-            challengeType: challengeType,
-            target: target,
-            reward: reward,
-            level: level,
-            isActive: true
-        });
-        
-        emit ChallengeAdded(challengeCount, title, target, reward);
+        emit ChallengeAdded(challengeCount, target, reward, level, cType);
     }
     
-    /**
-     * @notice Deactivate a challenge
-     * @param challengeId Challenge ID to deactivate
-     */
     function deactivateChallenge(uint256 challengeId) external onlyOwner {
-        require(challengeId > 0 && challengeId <= challengeCount, "Invalid challenge ID");
-        challenges[challengeId].isActive = false;
+        require(challengeId > 0 && challengeId <= challengeCount, "Invalid ID");
+        challengeActive[challengeId] = false;
     }
     
-    /**
-     * @notice Manually distribute reward (for social challenges, etc.)
-     * @param user User address
-     * @param amount Reward amount
-     */
     function distributeReward(address user, uint256 amount) external onlyOwner {
-        require(fitToken.balanceOf(address(this)) >= amount, "Insufficient contract balance");
+        require(fitToken.balanceOf(address(this)) >= amount, "Insufficient balance");
         fitToken.transfer(user, amount);
         emit RewardDistributed(user, amount, "Manual distribution");
     }
     
-    /**
-     * @notice Withdraw FIT tokens from contract (emergency)
-     * @param amount Amount to withdraw
-     */
     function withdrawTokens(uint256 amount) external onlyOwner {
         fitToken.transfer(owner, amount);
     }
     
-    // ====================================================
-    // VIEW FUNCTIONS
-    // ====================================================
-    
-    /**
-     * @notice Get user total steps
-     * @param user User address
-     * @return Total steps
-     */
+    // View functions
     function getTotalSteps(address user) external view returns (uint256) {
         return totalSteps[user];
     }
     
-    /**
-     * @notice Get challenge details
-     * @param challengeId Challenge ID
-     * @return Challenge struct
-     */
-    function getChallenge(uint256 challengeId) external view returns (Challenge memory) {
-        require(challengeId > 0 && challengeId <= challengeCount, "Invalid challenge ID");
-        return challenges[challengeId];
+    function getUserLevel(address user) external view returns (uint256) {
+        uint256 level = userLevel[user];
+        return level == 0 ? 1 : level;
     }
     
-    /**
-     * @notice Get user progress on a challenge
-     * @param user User address
-     * @param challengeId Challenge ID
-     * @return Current progress
-     */
+    function getChallenge(uint256 challengeId) external view returns (
+        uint256 target,
+        uint256 reward,
+        uint256 level,
+        bool active
+    ) {
+        require(challengeId > 0 && challengeId <= challengeCount, "Invalid ID");
+        return (
+            challengeTarget[challengeId],
+            challengeReward[challengeId],
+            challengeLevel[challengeId],
+            challengeActive[challengeId]
+        );
+    }
+    
     function getChallengeProgress(address user, uint256 challengeId) external view returns (uint256) {
         return userChallengeProgress[user][challengeId];
     }
     
-    /**
-     * @notice Check if user completed a challenge
-     * @param user User address
-     * @param challengeId Challenge ID
-     * @return True if completed
-     */
     function isChallengeCompleted(address user, uint256 challengeId) external view returns (bool) {
         return challengeCompleted[user][challengeId];
     }
     
-    /**
-     * @notice Get contract FIT token balance
-     * @return Token balance
-     */
     function getContractBalance() external view returns (uint256) {
         return fitToken.balanceOf(address(this));
     }

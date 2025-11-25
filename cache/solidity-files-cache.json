@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "C:\\Users\\labri\\OneDrive\\Desktop\\fitnessapp\\hedera-fit-backend\\contracts\\FitnessContract.sol": {
-      "lastModificationDate": 1763757008065,
-      "contentHash": "418881c5f33ac112e84b8c24cfdce5fd",
+      "lastModificationDate": 1764047495348,
+      "contentHash": "ea6bf7cc8df0c8cfeb5c7fe6d8ab0ce4",
       "sourceName": "contracts/FitnessContract.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -39,8 +39,8 @@
       ]
     },
     "C:\\Users\\labri\\OneDrive\\Desktop\\fitnessapp\\hedera-fit-backend\\contracts\\MarketplaceContract.sol": {
-      "lastModificationDate": 1763760898876,
-      "contentHash": "7968687284d412171403f735f6f4a3f1",
+      "lastModificationDate": 1763999022572,
+      "contentHash": "555a9fd866eae49d7c0252cf294a400c",
       "sourceName": "contracts/MarketplaceContract.sol",
       "solcConfig": {
         "version": "0.8.20",

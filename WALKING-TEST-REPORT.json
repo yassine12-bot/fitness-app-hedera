@@ -1,0 +1,11 @@
+[
+  {
+    "step": "ERROR",
+    "error": "Request failed with status code 500",
+    "details": {
+      "success": false,
+      "message": "Erreur lors de la récupération du wallet",
+      "error": "SQLITE_ERROR: no such column: walletCreatedAt"
+    }
+  }
+]

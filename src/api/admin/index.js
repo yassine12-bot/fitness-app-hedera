@@ -3,7 +3,9 @@ const router = express.Router();
 const db = require('../../lib/db');
 const authMiddleware = require('../../auth/middleware');
 const adminMiddleware = require('../../auth/admin-middleware');
-
+// Add marketplace admin routes
+const marketplaceRoutes = require('./marketplace');
+router.use('/marketplace', marketplaceRoutes);
 // ==================== PRODUCTS MANAGEMENT ====================
 
 /**

@@ -2,9 +2,14 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title MarketplaceContract
+ * @title MarketplaceContract (UPDATED VERSION)
  * @notice NFT marketplace for purchasing products with FIT tokens
  * @dev Handles product definition, purchases, NFT minting, and QR verification
+ * 
+ * NEW FEATURES:
+ * - updatePrice() - Change product prices without redeploying
+ * - getNFTCount() - Get total NFT count for ID extraction
+ * - PriceUpdated event for tracking price changes
  */
 
 interface IHRC20 {
@@ -80,6 +85,13 @@ contract MarketplaceContract {
     event StockUpdated(
         uint256 indexed productId,
         uint256 newStock
+    );
+    
+    // ✨ NEW EVENT
+    event PriceUpdated(
+        uint256 indexed productId,
+        uint256 oldPrice,
+        uint256 newPrice
     );
     
     // ====================================================
@@ -217,6 +229,21 @@ contract MarketplaceContract {
     }
     
     /**
+     * ✨ NEW FUNCTION: Update product price
+     * @notice Update the price of an existing product
+     * @param productId Product ID
+     * @param newPrice New price in FIT tokens
+     */
+    function updatePrice(uint256 productId, uint256 newPrice) external onlyOwner {
+        require(productId > 0 && productId <= productCount, "Invalid product");
+        
+        uint256 oldPrice = products[productId].priceTokens;
+        products[productId].priceTokens = newPrice;
+        
+        emit PriceUpdated(productId, oldPrice, newPrice);
+    }
+    
+    /**
      * @notice Update product stock
      * @param productId Product ID
      * @param newStock New stock amount
@@ -234,6 +261,15 @@ contract MarketplaceContract {
     function deactivateProduct(uint256 productId) external onlyOwner {
         require(productId > 0 && productId <= productCount, "Invalid product");
         products[productId].isActive = false;
+    }
+    
+    /**
+     * @notice Activate a product
+     * @param productId Product ID
+     */
+    function activateProduct(uint256 productId) external onlyOwner {
+        require(productId > 0 && productId <= productCount, "Invalid product");
+        products[productId].isActive = true;
     }
     
     /**
@@ -266,6 +302,15 @@ contract MarketplaceContract {
     function getNFT(uint256 nftId) external view returns (NFT memory) {
         require(nftId > 0 && nftId <= nftCount, "Invalid NFT");
         return nfts[nftId];
+    }
+    
+    /**
+     * ✨ NEW FUNCTION: Get total NFT count
+     * @notice Get the total number of NFTs minted
+     * @return Total NFT count
+     */
+    function getNFTCount() external view returns (uint256) {
+        return nftCount;
     }
     
     /**

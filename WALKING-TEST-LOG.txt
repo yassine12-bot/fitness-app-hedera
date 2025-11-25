@@ -1,0 +1,39 @@
+================================================================================
+🚶 COMPREHENSIVE WALKING TEST - ALL BLOCKCHAIN QUERIES
+================================================================================
+
+✅ Services initialized
+   Contract: 0.0.7316345
+   Token: 0.0.7180699
+
+📝 STEP 1: Get or Create Test User
+--------------------------------------------------------------------------------
+✅ Using existing user with wallet
+   Email: walk-test-1764034283816@test.com
+   Account: 0.0.7317346
+
+⚠️  NOTE: You need to login manually or provide password
+   For this test, we'll create a NEW user instead...
+
+Creating new test user...
+✅ User created
+   Email: walk-test-1764034505381@test.com
+   Password: WalkTest123!
+
+📝 STEP 2: Create or Get Wallet
+--------------------------------------------------------------------------------
+
+❌ ERROR: Request failed with status code 500
+   Status: 500
+   Data: {"success":false,"message":"Erreur lors de la récupération du wallet","error":"SQLITE_ERROR: no such column: walletCreatedAt"}
+
+Stack:
+AxiosError: Request failed with status code 500
+    at settle (C:\Users\labri\OneDrive\Desktop\fitnessapp\hedera-fit-backend\node_modules\axios\dist\node\axios.cjs:2106:12)
+    at IncomingMessage.handleStreamEnd (C:\Users\labri\OneDrive\Desktop\fitnessapp\hedera-fit-backend\node_modules\axios\dist\node\axios.cjs:3491:11)
+    at IncomingMessage.emit (node:events:530:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (C:\Users\labri\OneDrive\Desktop\fitnessapp\hedera-fit-backend\node_modules\axios\dist\node\axios.cjs:4731:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async comprehensiveWalkingTest (C:\Users\labri\OneDrive\Desktop\fitnessapp\hedera-fit-backend\WALKING-TEST-ROBUST.js:124:27)

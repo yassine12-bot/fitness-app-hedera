@@ -160,35 +160,24 @@ async function startServer() {
     // ✨ NOUVEAU: Démarrer le Cache Sync Service
     // ====================================================
     if (fitnessInitialized && marketplaceInitialized) {
-      console.log('🔄 Démarrage du Cache Sync Service...');
-      const cacheSync = require('./lib/cache-sync');
-      await cacheSync.start();
-      console.log('');
-    }
+  // ✨ Sync products from contract on startup
+  console.log('📦 Syncing products from contract...');
+  const syncProducts = require('./scripts/sync-products-from-contract');
+  await syncProducts();
+  console.log('');
+  
+  // Start cache sync service
+  console.log('🔄 Démarrage du Cache Sync Service...');
+  const cacheSync = require('./lib/cache-sync');
+  await cacheSync.start();
+  console.log('');
+}
 
     // Démarrer le serveur
     app.listen(PORT, () => {
       console.log('');
       console.log('='.repeat(60));
       console.log('🚀 Serveur démarré avec succès!');
-      console.log('='.repeat(60));
-      console.log(`📍 URL: http://localhost:${PORT}`);
-      console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🤖 IA: ${process.env.HUGGINGFACE_API_KEY ? 'Activée ✅' : 'Désactivée ❌'}`);
-      console.log(`📊 Cache Topic: ${topicCache.messages.length} messages`);
-
-      // Afficher l'état des contracts
-      if (fitnessInitialized && marketplaceInitialized) {
-        console.log(`📜 Smart Contracts: Activés ✅`);
-        console.log(`   → FitnessContract: ${process.env.FITNESS_CONTRACT_ADDRESS}`);
-        console.log(`   → MarketplaceContract: ${process.env.MARKETPLACE_CONTRACT_ADDRESS}`);
-        console.log(`🔄 Cache Sync: Actif (polling 30s)`);
-      } else {
-        console.log(`📜 Smart Contracts: Non configurés ⚠️ (run: npm run deploy)`);
-      }
-
-      console.log('='.repeat(60));
-      console.log('');
       console.log('📚 Routes disponibles:');
       console.log('  GET  /health');
       console.log('  POST /auth/register');

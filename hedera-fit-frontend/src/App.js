@@ -158,11 +158,12 @@ function App() {
         {currentTab === 'simulator' && (
           <StepSimulator 
             token={token} 
+            user={user}
             onStepsAdded={refreshBalance}
           />
         )}
         {currentTab === 'challenges' && (
-          <ChallengesProgress token={token} />
+          <ChallengesProgress token={token} user={user} />
         )}
         {currentTab === 'marketplace' && (
           <Marketplace 

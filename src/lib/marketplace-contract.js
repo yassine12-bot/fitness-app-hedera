@@ -120,42 +120,62 @@ class MarketplaceContractService {
     }
   }
 
-  async getProduct(productId) {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    if (!this.client) {
-      throw new Error('MarketplaceContract service not initialized');
-    }
-
-    try {
-      const params = new ContractFunctionParameters()
-        .addUint256(productId);
-
-      const query = new ContractCallQuery()
-        .setContractId(this.contractId)
-        .setGas(100000)
-        .setFunction("getProduct", params);
-
-      const result = await query.execute(this.client);
-
-      return {
-        id: result.getUint256(0).toNumber(),
-        name: result.getString(1),
-        description: result.getString(2),
-        category: result.getString(3),
-        priceTokens: result.getUint256(4).toNumber(),
-        stock: result.getUint256(5).toNumber(),
-        imageUrl: result.getString(6),
-        isActive: result.getBool(7)
-      };
-
-    } catch (error) {
-      console.error('❌ Error querying product:', error.message);
-      return null;
-    }
+async getProduct(productId) {
+  if (!this.initialized) {
+    await this.initialize();
   }
+
+  if (!this.client) {
+    throw new Error('MarketplaceContract service not initialized');
+  }
+
+  try {
+    const params = new ContractFunctionParameters()
+      .addUint256(productId);
+
+    const query = new ContractCallQuery()
+      .setContractId(this.contractId)
+      .setGas(100000)
+      .setFunction("getProduct", params);
+
+    const result = await query.execute(this.client);
+    
+    // ✨ Use ethers.js to properly decode the struct
+    const ethers = require('ethers');
+    const bytes = result.asBytes();
+    
+    // Convert Uint8Array to hex string
+    const hexString = '0x' + Buffer.from(bytes).toString('hex');
+    
+    // ABI for Product struct return
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+    
+    const decoded = abiCoder.decode(
+      [
+        'tuple(uint256 id, string name, string description, string category, uint256 priceTokens, uint256 stock, string imageUrl, bool isActive)'
+      ],
+      hexString
+    );
+
+    const product = decoded[0];
+
+    return {
+      id: Number(product.id),
+      name: product.name,
+      description: product.description,
+      category: product.category,
+      priceTokens: Number(product.priceTokens),
+      stock: Number(product.stock),
+      imageUrl: product.imageUrl,
+      isActive: product.isActive
+    };
+
+  } catch (error) {
+    console.error('❌ Error querying product:', error.message);
+    console.error('Full error:', error);
+    return null;
+  }
+}
 
   async getNFT(nftId) {
     if (!this.initialized) {
@@ -340,7 +360,7 @@ class MarketplaceContractService {
 
       const transaction = new ContractExecuteTransaction()
         .setContractId(this.contractId)
-        .setGas(300000)
+        .setGas(2000000)
         .setFunction("addProduct", params);
 
       const txResponse = await transaction.execute(this.client);
@@ -358,8 +378,6 @@ class MarketplaceContractService {
       throw error;
     }
   }
-
-// Add to marketplace-contract.js before close() method
 
   async getProductCount() {
     if (!this.initialized) {
@@ -385,7 +403,10 @@ class MarketplaceContractService {
     }
   }
 
-  async getProduct(productId) {
+  /**
+   * ✨ NEW: Get total NFT count
+   */
+  async getNFTCount() {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -395,34 +416,59 @@ class MarketplaceContractService {
     }
 
     try {
-      const params = new ContractFunctionParameters()
-        .addUint256(productId);
-
       const query = new ContractCallQuery()
         .setContractId(this.contractId)
         .setGas(100000)
-        .setFunction("getProduct", params);
+        .setFunction("getNFTCount");
 
       const result = await query.execute(this.client);
-      
-      // Parse the Product struct
-      return {
-        id: result.getUint256(0).toNumber(),
-        name: result.getString(1),
-        description: result.getString(2),
-        category: result.getString(3),
-        priceTokens: result.getUint256(4).toNumber(),
-        stock: result.getUint256(5).toNumber(),
-        imageUrl: result.getString(6),
-        isActive: result.getBool(7)
-      };
+      return result.getUint256(0).toNumber();
 
     } catch (error) {
-      console.error('❌ Error querying product:', error.message);
-      throw error;
+      console.error('❌ Error querying NFT count:', error.message);
+      return 0;
     }
   }
 
+  /**
+   * ✨ NEW: Update product price
+   */
+  async updatePrice(productId, newPrice) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.client) {
+      throw new Error('MarketplaceContract service not initialized');
+    }
+
+    try {
+      console.log(`💰 Updating price for product ${productId} to ${newPrice} FIT`);
+
+      const params = new ContractFunctionParameters()
+        .addUint256(productId)
+        .addUint256(newPrice);
+
+      const transaction = new ContractExecuteTransaction()
+        .setContractId(this.contractId)
+        .setGas(200000)
+        .setFunction("updatePrice", params);
+
+      const txResponse = await transaction.execute(this.client);
+      const receipt = await txResponse.getReceipt(this.client);
+
+      console.log(`✅ Price updated! Status: ${receipt.status.toString()}`);
+
+      return {
+        success: true,
+        transactionId: txResponse.transactionId.toString()
+      };
+
+    } catch (error) {
+      console.error('❌ Error updating price:', error.message);
+      throw error;
+    }
+  }
 
   close() {
     if (this.client) {

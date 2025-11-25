@@ -1,76 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './StepSimulator.css';
 
-/**
- * STEP SIMULATOR - Simulateur de pas EXPONENTIEL
- * 
- * FONCTION: v(t) = 100 × e^(0.144t)
- * - v₀ = 100 pas/sec
- * - k = 0.144
- * - Atteint ~10,000 pas en 20 secondes
- * 
- * AMÉLIORATION:
- * - Calcul en temps réel basé sur la formule exponentielle
- * - Affichage de la vitesse instantanée
- * - Animation visuelle de l'accélération
- */
-
-const StepSimulator = ({ token, onStepsAdded }) => {
+const StepSimulator = ({ token, user, onStepsAdded }) => {
   const [isHolding, setIsHolding] = useState(false);
-  const [totalSteps, setTotalSteps] = useState(0);
+  const [totalSteps, setTotalSteps] = useState(user?.totalSteps || 0);
   const [sessionSteps, setSessionSteps] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [holdDuration, setHoldDuration] = useState(0);
-  const [challenges, setChallenges] = useState([]);
   const [message, setMessage] = useState('');
+  const [lastTxId, setLastTxId] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const intervalRef = useRef(null);
   const startTimeRef = useRef(null);
   const lastStepsRef = useRef(0);
 
   useEffect(() => {
-    fetchActiveChallenges();
-  }, []);
-
-  const fetchActiveChallenges = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/api/challenges/active', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        // ✅ FIX: Nouvelle API retourne { challenges: [...], userLevel: 1 }
-        // ✅ FIX: Ensure challengesArray is always an array
-        let challengesArray = [];
-        if (data.data) {
-          if (Array.isArray(data.data)) {
-            challengesArray = data.data;
-          } else if (data.data.challenges && Array.isArray(data.data.challenges)) {
-            challengesArray = data.data.challenges;
-          }
-        }
-        const stepChallenges = challengesArray.filter(c => 
-          c.type === 'daily_steps' || c.type === 'duration_steps'
-        );
-        setChallenges(stepChallenges);
-      }
-    } catch (error) {
-      console.error('Erreur fetch challenges:', error);
+    if (user?.totalSteps) {
+      setTotalSteps(user.totalSteps);
     }
-  };
+  }, [user]);
 
-  /**
-   * Formule exponentielle: v(t) = 100 × e^(0.144t)
-   * Intégrale cumulée: S(t) = (100/0.144) × (e^(0.144t) - 1)
-   */
   const calculateSteps = (elapsedSeconds) => {
-    const v0 = 100;  // vitesse initiale (pas/sec)
-    const k = 0.144; // coefficient exponentiel
-    
-    // Calcul des pas cumulés: S(t) = (v₀/k) × (e^(kt) - 1)
+    const v0 = 100;
+    const k = 0.144;
     const steps = (v0 / k) * (Math.exp(k * elapsedSeconds) - 1);
-    
-    // Vitesse instantanée: v(t) = v₀ × e^(kt)
     const speed = v0 * Math.exp(k * elapsedSeconds);
     
     return {
@@ -83,10 +37,10 @@ const StepSimulator = ({ token, onStepsAdded }) => {
     setIsHolding(true);
     setSessionSteps(0);
     setMessage('');
+    setLastTxId('');
     startTimeRef.current = Date.now();
     lastStepsRef.current = 0;
 
-    // Mise à jour toutes les 50ms pour une animation fluide
     intervalRef.current = setInterval(() => {
       const elapsedMs = Date.now() - startTimeRef.current;
       const elapsedSeconds = elapsedMs / 1000;
@@ -94,7 +48,6 @@ const StepSimulator = ({ token, onStepsAdded }) => {
       const { steps, speed } = calculateSteps(elapsedSeconds);
       
       setSessionSteps(steps);
-      setTotalSteps(prev => prev + (steps - lastStepsRef.current));
       setCurrentSpeed(speed);
       setHoldDuration(elapsedSeconds);
       
@@ -109,36 +62,47 @@ const StepSimulator = ({ token, onStepsAdded }) => {
     clearInterval(intervalRef.current);
 
     if (sessionSteps > 0) {
-      await updateChallenges(sessionSteps);
-      
-      if (onStepsAdded) {
-        onStepsAdded(sessionSteps);
-      }
+      await logStepsToBlockchain(sessionSteps);
     }
   };
 
-  // ✅ FIX: API correcte pour update-progress
-  const updateChallenges = async (steps) => {
+  const logStepsToBlockchain = async (steps) => {
+    setLoading(true);
+    setMessage('⏳ Enregistrement sur la blockchain...');
+
     try {
-      // Appeler l'API une seule fois pour tous les challenges
-      const response = await fetch('http://localhost:3000/api/challenges/update-progress', {
+      const response = await fetch('http://localhost:3000/api/workouts/steps', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ steps })  // ✅ Format correct
+        body: JSON.stringify({
+          steps,
+          distance: (steps * 0.0007).toFixed(2),
+          calories: Math.floor(steps * 0.05)
+        })
       });
 
       const data = await response.json();
       
       if (data.success) {
-        setMessage(`✅ +${steps.toLocaleString()} pas ajoutés aux challenges!`);
-        await fetchActiveChallenges();  // Rafraîchir les challenges
+        const txId = data.data.blockchain.transactionId;
+        setLastTxId(txId);
+        setTotalSteps(prev => prev + steps);
+        setMessage(`✅ +${steps.toLocaleString()} pas enregistrés!`);
+        
+        if (onStepsAdded) {
+          onStepsAdded();
+        }
+      } else {
+        setMessage(`❌ Erreur: ${data.message}`);
       }
     } catch (error) {
-      console.error('Erreur update challenges:', error);
-      setMessage('❌ Erreur lors de la mise à jour');
+      console.error('Erreur blockchain:', error);
+      setMessage('❌ Erreur de connexion');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -152,16 +116,21 @@ const StepSimulator = ({ token, onStepsAdded }) => {
   return (
     <div className="step-simulator">
       <div className="simulator-header">
-        <h2>🚶‍♂️ Simulateur de Pas Exponentiel</h2>
+        <h2>🚶‍♂️ Simulateur de Pas - Blockchain</h2>
         <p className="simulator-desc">
-          Maintiens le bouton - L'accélération augmente avec le temps!
+          Maintiens le bouton - Les pas sont enregistrés sur Hedera!
         </p>
+        {user?.hederaAccountId && (
+          <p className="wallet-info">
+            🔐 Wallet: {user.hederaAccountId}
+          </p>
+        )}
       </div>
 
       <div className="simulator-stats">
         <div className="stat-card">
           <div className="stat-value">{totalSteps.toLocaleString()}</div>
-          <div className="stat-label">Total pas</div>
+          <div className="stat-label">Total pas (blockchain)</div>
         </div>
         <div className="stat-card session">
           <div className="stat-value">{sessionSteps.toLocaleString()}</div>
@@ -177,7 +146,6 @@ const StepSimulator = ({ token, onStepsAdded }) => {
         )}
       </div>
 
-      {/* Barre de progression temporelle */}
       {isHolding && (
         <div className="time-progress">
           <div className="time-bar">
@@ -198,17 +166,20 @@ const StepSimulator = ({ token, onStepsAdded }) => {
 
       <div className="simulator-control">
         <button
-          className={`hold-button ${isHolding ? 'holding' : ''}`}
+          className={`hold-button ${isHolding ? 'holding' : ''} ${loading ? 'loading' : ''}`}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onTouchStart={handleMouseDown}
           onTouchEnd={handleMouseUp}
+          disabled={loading}
           style={{
             transform: isHolding ? `scale(${1 + holdDuration * 0.02})` : 'scale(1)'
           }}
         >
-          {isHolding ? (
+          {loading ? (
+            <span className="button-text">⏳ Enregistrement...</span>
+          ) : isHolding ? (
             <>
               <span className="pulse-ring"></span>
               <span className="button-text">
@@ -221,29 +192,26 @@ const StepSimulator = ({ token, onStepsAdded }) => {
         </button>
       </div>
 
-      {/* Formule mathématique */}
       <div className="formula-info">
         <small>
-          📐 Formule: v(t) = 100 × e<sup>0.144t</sup>
+          📐 Formule: v(t) = 100 × e<sup>0.144t</sup> | ⛓️ Smart Contract
         </small>
       </div>
 
       {message && (
-        <div className={`simulator-message ${message.includes('🎉') ? 'success' : ''}`}>
+        <div className={`simulator-message ${message.includes('✅') ? 'success' : message.includes('❌') ? 'error' : 'info'}`}>
           {message}
-        </div>
-      )}
-
-      {challenges.length > 0 && (
-        <div className="active-challenges-info">
-          <h3>Challenges actifs ({challenges.length})</h3>
-          <ul>
-            {challenges.map(c => (
-              <li key={c.id}>
-                {c.title} - {c.target.toLocaleString()} pas
-              </li>
-            ))}
-          </ul>
+          {lastTxId && (
+            <div className="tx-link">
+              <a 
+                href={`https://hashscan.io/testnet/transaction/${lastTxId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                🔗 Voir sur Hashscan
+              </a>
+            </div>
+          )}
         </div>
       )}
     </div>

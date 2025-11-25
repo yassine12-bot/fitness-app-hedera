@@ -245,3 +245,93 @@
     height: 24px;
   }
 }
+/* Add to existing ChallengesProgress.css */
+
+.challenges-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.challenges-header h2 {
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.wallet-badge {
+  font-size: 0.85rem;
+  color: #666;
+  background: #f8f9fa;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+.challenge-card.locked {
+  opacity: 0.6;
+  background: #f8f9fa;
+  border-color: #ddd;
+}
+
+.locked-badge {
+  background: #ff9800;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  margin-right: 0.5rem;
+}
+
+.locked-message {
+  text-align: center;
+  padding: 1.5rem;
+  background: #fff3cd;
+  border-radius: 8px;
+  color: #856404;
+  font-weight: 500;
+  margin: 1rem 0;
+}
+
+.challenge-level {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* Add to existing StepSimulator.css */
+
+.wallet-info {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.5rem;
+  background: #f8f9fa;
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.simulator-message.info {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.tx-link {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255,255,255,0.2);
+}
+
+.tx-link a {
+  color: inherit;
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
+
+.tx-link a:hover {
+  opacity: 0.8;
+}
+
+.hold-button.loading {
+  opacity: 0.7;
+  cursor: wait;
+}

@@ -4,6 +4,7 @@ const db = require('../../lib/db');
 const authMiddleware = require('../../auth/middleware');
 const marketplaceContract = require('../../lib/marketplace-contract');
 const cacheSync = require('../../lib/cache-sync');
+const QRCode = require('qrcode'); // ✨ ADD THIS
 const { 
   TransferTransaction, 
   TokenId, 
@@ -14,6 +15,7 @@ const {
   ContractExecuteTransaction,
   ContractFunctionParameters,
   TransactionId,
+   ContractId,
   Timestamp
 } = require('@hashgraph/sdk'); 
 const { decryptPrivateKey } = require('../../lib/wallet-encryption');
@@ -29,7 +31,7 @@ const { decryptPrivateKey } = require('../../lib/wallet-encryption');
 /**
  * GET /api/marketplace/products
  */
-router.get('/products', authMiddleware, async (req, res) => {
+router.get('/products', async (req, res) => {
   try {
     const { category } = req.query;
     
@@ -49,7 +51,7 @@ router.get('/products', authMiddleware, async (req, res) => {
       }
     }
     
-    // Sort by category and price (same as before)
+    // Sort by category and price
     products.sort((a, b) => {
       if (a.category !== b.category) {
         return a.category.localeCompare(b.category);
@@ -104,12 +106,17 @@ router.get('/products/:id', authMiddleware, async (req, res) => {
 
 /**
  * POST /api/marketplace/purchase
- * FULLY DECENTRALIZED with unique transaction IDs
+ * ✨ UPDATED: Real NFT ID extraction + QR code generation
  */
 router.post('/purchase', authMiddleware, async (req, res) => {
   let userClient = null;
   
   try {
+    // ✨ ADD THESE DEBUG LINES
+    console.log('🔍 DEBUG req.user:', req.user);
+    console.log('🔍 DEBUG req.user.id:', req.user?.id);
+    console.log('🔍 DEBUG headers:', req.headers.authorization);
+    
     const { productId, quantity = 1 } = req.body;
     
     if (!productId) {
@@ -118,6 +125,8 @@ router.post('/purchase', authMiddleware, async (req, res) => {
         message: 'productId requis'
       });
     }
+    
+  
     
     // ====================================================
     // Get product from cache
@@ -193,8 +202,8 @@ router.post('/purchase', authMiddleware, async (req, res) => {
     // Approve contract to spend FIT tokens
     // ====================================================
     const fitTokenId = TokenId.fromString(process.env.FIT_TOKEN_ID);
-    const contractId = AccountId.fromString(process.env.MARKETPLACE_CONTRACT_ADDRESS);
-    
+const contractIdForApproval = AccountId.fromString(process.env.MARKETPLACE_CONTRACT_ADDRESS);  // ✅ For approval
+const contractIdForCall = ContractId.fromString(process.env.MARKETPLACE_CONTRACT_ADDRESS);     // ✅ For contract call
     console.log(`🔓 Approving contract to spend ${totalCost} FIT...`);
     
     // Generate unique transaction ID for approval
@@ -206,9 +215,9 @@ router.post('/purchase', authMiddleware, async (req, res) => {
     );
     
     const approveTx = await new AccountAllowanceApproveTransaction()
-      .setTransactionId(approveTxId)
-      .approveTokenAllowance(fitTokenId, user.hederaAccountId, contractId, totalCost)
-      .execute(userClient);
+  .setTransactionId(approveTxId)
+  .approveTokenAllowance(fitTokenId, user.hederaAccountId, contractIdForApproval, totalCost)  // ✅ Use AccountId
+  .execute(userClient);
     
     await approveTx.getReceipt(userClient);
     console.log(`✅ Approval granted`);
@@ -231,30 +240,48 @@ router.post('/purchase', authMiddleware, async (req, res) => {
     );
     
     const contractTx = await new ContractExecuteTransaction()
-      .setTransactionId(contractTxId)
-      .setContractId(contractId)
-      .setGas(1000000)
-      .setFunction("purchaseProduct", contractParams)
-      .execute(userClient);
+  .setTransactionId(contractTxId)
+  .setContractId(contractIdForCall)  // ✅ Use ContractId
+  .setGas(3000000)
+  .setFunction("purchaseProduct", contractParams)
+  .execute(userClient);
     
     const contractReceipt = await contractTx.getReceipt(userClient);
     
     console.log(`✅ Purchase complete! TX: ${contractTx.transactionId.toString()}`);
     console.log(`   Status: ${contractReceipt.status.toString()}`);
     
-    const contractResult = {
-      success: true,
-      transactionId: contractTx.transactionId.toString()
+    const transactionId = contractTx.transactionId.toString();
+    // ✨ ADD: Wait 2 seconds for blockchain state to update
+await new Promise(resolve => setTimeout(resolve, 5000));
+    // ====================================================
+    // ✨ NEW: Extract REAL NFT ID from contract
+    // ====================================================
+    console.log('🔍 Querying contract for NFT ID...');
+    const nftId = await marketplaceContract.getNFTCount();
+    console.log(`✅ NFT ID extracted: ${nftId}`);
+    
+    // ====================================================
+    // ✨ NEW: Generate QR code with full NFT data
+    // ====================================================
+    const purchaseDate = new Date().toISOString();
+    const qrData = {
+      nftId: nftId,
+      productId: productId,
+      productName: product.name,
+      price: totalCost,
+      purchaseDate: purchaseDate,
+      buyer: user.hederaAccountId,
+      transactionId: transactionId
     };
     
-    // ====================================================
-    // Get NFT ID from contract events (temporary mock)
-    // TODO: Parse contract logs to get real NFT ID
-    // ====================================================
-    const nftId = Date.now();
+    // Generate QR code as Data URL
+    const qrCodeDataUrl = await QRCode.toDataURL(JSON.stringify(qrData));
+    
+    console.log('✅ QR code generated with full data');
     
     // ====================================================
-    // Sync cache
+    // Sync cache (will also sync product stock)
     // ====================================================
     await cacheSync.onNFTPurchased(
       req.user.id,
@@ -262,7 +289,7 @@ router.post('/purchase', authMiddleware, async (req, res) => {
       nftId,
       productId,
       totalCost,
-      contractResult.transactionId
+      transactionId
     );
     
     // Close client
@@ -271,23 +298,27 @@ router.post('/purchase', authMiddleware, async (req, res) => {
     }
     
     // ====================================================
-    // Response
+    // ✨ UPDATED Response with real NFT ID + QR code
     // ====================================================
     res.json({
       success: true,
-      message: `Achat réussi! ${product.name} x${quantity} 🎉 (NFT minted on-chain)`,
+      message: `Achat réussi! ${product.name} x${quantity} 🎉`,
       data: {
         purchaseId: nftId,
+        nftId: nftId,  // ✅ Real blockchain NFT ID
         product: product.name,
-        quantity,
-        totalCost,
+        productId: productId,
+        quantity: quantity,
+        totalCost: totalCost,
+        purchaseDate: purchaseDate,
         remainingBalance: user.fitBalance - totalCost,
-        qrCode: `NFT-${nftId}`,
-        nftId: nftId,
+        qrCode: qrCodeDataUrl,  // ✅ Full QR code image as data URL
+        qrData: qrData,         // ✅ Raw data for verification
         isUsed: false,
         blockchain: {
-          transactionId: contractResult.transactionId,
-          explorerUrl: `https://hashscan.io/testnet/transaction/${contractResult.transactionId}`
+          transactionId: transactionId,
+          explorerUrl: `https://hashscan.io/testnet/transaction/${transactionId}`,
+          nftContract: process.env.MARKETPLACE_CONTRACT_ADDRESS
         }
       }
     });
@@ -316,6 +347,8 @@ router.post('/purchase', authMiddleware, async (req, res) => {
  * GET /api/marketplace/purchases
  */
 router.get('/purchases', authMiddleware, async (req, res) => {
+   console.log('🔍 DEBUG /purchases - req.user:', req.user); // ✨ ADD THIS
+  
   try {
     const purchases = await db.all(`
       SELECT 
@@ -373,7 +406,7 @@ router.get('/categories', authMiddleware, async (req, res) => {
 
 /**
  * POST /api/marketplace/verify-qr
- * SIMPLIFIED: Cache-only verification (NFT IDs are mocked)
+ * ✨ UPDATED: Can verify both old mock NFTs and new real NFTs
  */
 router.post('/verify-qr', authMiddleware, async (req, res) => {
   try {
@@ -414,7 +447,7 @@ router.post('/verify-qr', authMiddleware, async (req, res) => {
       });
     }
     
-    // Mark as used in cache (skip contract for now - NFT IDs are mocked)
+    // Mark as used in cache
     await db.run(`
       UPDATE purchases
       SET isUsed = 1, usedAt = CURRENT_TIMESTAMP
