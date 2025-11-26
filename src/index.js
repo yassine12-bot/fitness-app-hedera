@@ -160,18 +160,23 @@ async function startServer() {
     // ✨ NOUVEAU: Démarrer le Cache Sync Service
     // ====================================================
     if (fitnessInitialized && marketplaceInitialized) {
-  // ✨ Sync products from contract on startup
-  console.log('📦 Syncing products from contract...');
-  const syncProducts = require('./scripts/sync-products-from-contract');
-  await syncProducts();
-  console.log('');
-  
-  // Start cache sync service
-  console.log('🔄 Démarrage du Cache Sync Service...');
-  const cacheSync = require('./lib/cache-sync');
-  await cacheSync.start();
-  console.log('');
-}
+      // ✨ Sync products from contract on startup
+      console.log('📦 Syncing products from contract...');
+      const syncProducts = require('./scripts/sync-products-from-contract');
+      await syncProducts();
+      console.log('');
+
+      // ❌ DISABLED - Burning too much HBAR!
+      // Cache sync makes 20+ blockchain queries per workout
+      // This was consuming 2000 HBAR in 20 minutes
+      // TODO: Re-enable with optimization (batch queries, smart caching)
+
+      // Start cache sync service
+      // console.log('🔄 Démarrage du Cache Sync Service...');
+      // const cacheSync = require('./lib/cache-sync');
+      // await cacheSync.start();
+      // console.log('');
+    }
 
     // Démarrer le serveur
     app.listen(PORT, () => {

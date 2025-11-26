@@ -37,8 +37,16 @@ router.get('/', authMiddleware, async (req, res) => {
  */
 router.post('/', authMiddleware, async (req, res) => {
   try {
+     // ✅ ADMIN-ONLY: Only admins can create topics
+    const user = await db.get('SELECT isAdmin FROM users WHERE id = ?', [req.user.id]);
+    
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Seuls les administrateurs peuvent créer des topics'
+      });
+    }
     const { name, description, isPrivate } = req.body;
-
     if (!name) {
       return res.status(400).json({
         success: false,

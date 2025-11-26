@@ -159,6 +159,58 @@ class CacheSyncService {
       throw error;
     }
   }
+    /**
+   * ✅ ADDED: Called after NFT purchase on blockchain
+   */
+  async onNFTPurchased(userId, hederaAccountId, nftId, productId, totalCost, transactionId) {
+    await this.initDB();
+
+    console.log(`🔄 Cache sync after NFT purchase: NFT ${nftId}, Product ${productId}`);
+
+    try {
+      // 1. Record purchase in database
+      await new Promise((resolve, reject) => {
+        this.db.run(`
+          INSERT INTO purchases (userId, productId, nftId, quantity, totalCost, qrCode, hederaTxId, createdAt)
+          VALUES (?, ?, ?, 1, ?, ?, ?, datetime('now'))
+        `, [userId, productId, nftId, totalCost, `NFT-${nftId}`, transactionId], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      // 2. Update user's FIT balance (deduct cost)
+      await new Promise((resolve, reject) => {
+        this.db.run(`
+          UPDATE users 
+          SET fitBalance = fitBalance - ?, updatedAt = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `, [totalCost, userId], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      // 3. Update product stock in cache
+      await new Promise((resolve, reject) => {
+        this.db.run(`
+          UPDATE products 
+          SET stock = stock - 1, updatedAt = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `, [productId], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      console.log(`✅ Purchase cache sync complete!`);
+      return { success: true };
+
+    } catch (error) {
+      console.error('❌ Error in onNFTPurchased:', error);
+      throw error;
+    }
+  }
 
   async syncAllChallenges() {
     await this.initDB();

@@ -88,7 +88,7 @@ class FitnessContractService {
 
     const query = new ContractCallQuery()
       .setContractId(this.contractId)
-      .setGas(100000)
+      .setGas(300000)
       .setFunction('getTotalSteps', params);
 
     const result = await query.execute(this.client);
@@ -107,7 +107,7 @@ class FitnessContractService {
 
     const query = new ContractCallQuery()
       .setContractId(this.contractId)
-      .setGas(100000)
+      .setGas(300000)
       .setFunction('getUserLevel', params);
 
     const result = await query.execute(this.client);
@@ -115,25 +115,26 @@ class FitnessContractService {
   }
 
   async getChallenge(challengeId) {
-    await this.initialize();
+  await this.initialize();
 
-    const params = new ContractFunctionParameters().addUint256(challengeId);
+  const params = new ContractFunctionParameters().addUint256(challengeId);
 
-    const query = new ContractCallQuery()
-      .setContractId(this.contractId)
-      .setGas(100000)
-      .setFunction('getChallenge', params);
+  const query = new ContractCallQuery()
+    .setContractId(this.contractId)
+    .setGas(300000)
+    .setFunction('getChallenge', params);
 
-    const result = await query.execute(this.client);
+  const result = await query.execute(this.client);
 
-    return {
-      id: challengeId,
-      target: result.getUint256(0).toNumber(),
-      reward: result.getUint256(1).toNumber(),
-      level: result.getUint256(2).toNumber(),
-      isActive: result.getBool(3)
-    };
-  }
+  // ✅ Contract returns 4 separate values, NOT a struct
+  return {
+    id: challengeId,
+    target: result.getUint256(0).toNumber(),
+    reward: result.getUint256(1).toNumber(),
+    level: result.getUint256(2).toNumber(),
+    isActive: result.getBool(3)
+  };
+}
 
   async getChallengeProgress(userId, challengeId) {
     await this.initialize();
@@ -146,7 +147,7 @@ class FitnessContractService {
 
     const query = new ContractCallQuery()
       .setContractId(this.contractId)
-      .setGas(100000)
+      .setGas(300000) // ✅ Increased to match marketplace
       .setFunction('getChallengeProgress', params);
 
     const result = await query.execute(this.client);
@@ -164,7 +165,7 @@ class FitnessContractService {
 
     const query = new ContractCallQuery()
       .setContractId(this.contractId)
-      .setGas(100000)
+      .setGas(300000) // ✅ Increased to match marketplace
       .setFunction('isChallengeCompleted', params);
 
     const result = await query.execute(this.client);
@@ -176,7 +177,7 @@ class FitnessContractService {
 
     const query = new ContractCallQuery()
       .setContractId(this.contractId)
-      .setGas(100000)
+      .setGas(300000)
       .setFunction('challengeCount');
 
     const result = await query.execute(this.client);
@@ -188,7 +189,7 @@ class FitnessContractService {
 
     const query = new ContractCallQuery()
       .setContractId(this.contractId)
-      .setGas(100000)
+      .setGas(300000)
       .setFunction('getContractBalance');
 
     const result = await query.execute(this.client);

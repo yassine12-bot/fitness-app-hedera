@@ -178,40 +178,47 @@ async getProduct(productId) {
 }
 
   async getNFT(nftId) {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    if (!this.client) {
-      throw new Error('MarketplaceContract service not initialized');
-    }
-
-    try {
-      const params = new ContractFunctionParameters()
-        .addUint256(nftId);
-
-      const query = new ContractCallQuery()
-        .setContractId(this.contractId)
-        .setGas(100000)
-        .setFunction("getNFT", params);
-
-      const result = await query.execute(this.client);
-
-      return {
-        id: result.getUint256(0).toNumber(),
-        productId: result.getUint256(1).toNumber(),
-        owner: result.getAddress(2),
-        purchaseDate: result.getUint256(3).toNumber(),
-        isUsed: result.getBool(4),
-        usedDate: result.getUint256(5).toNumber(),
-        metadata: result.getString(6)
-      };
-
-    } catch (error) {
-      console.error('❌ Error querying NFT:', error.message);
-      return null;
-    }
+  if (!this.initialized) {
+    await this.initialize();
   }
+  if (!this.client) {
+    throw new Error('MarketplaceContract service not initialized');
+  }
+  try {
+    const params = new ContractFunctionParameters()
+      .addUint256(nftId);
+    const query = new ContractCallQuery()
+      .setContractId(this.contractId)
+      .setGas(300000)
+      .setFunction("getNFT", params);
+    const result = await query.execute(this.client);
+    // ✅ USE ETHERS.JS TO DECODE THE STRUCT
+    const ethers = require('ethers');
+    const bytes = result.asBytes();
+    const hexString = '0x' + Buffer.from(bytes).toString('hex');
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+    
+    const decoded = abiCoder.decode(
+      ['tuple(uint256 id, uint256 productId, address owner, uint256 purchaseDate, bool isUsed, uint256 usedDate, string metadata)'],
+      hexString
+    );
+    
+    const nft = decoded[0];
+    
+    return {
+      id: Number(nft.id),
+      productId: Number(nft.productId),
+      owner: nft.owner,
+      purchaseDate: Number(nft.purchaseDate),
+      isUsed: nft.isUsed,
+      usedDate: Number(nft.usedDate),
+      metadata: nft.metadata
+    };
+  } catch (error) {
+    console.error('❌ Error querying NFT:', error.message);
+    return null;
+  }
+}
 
   async getNFTOwner(nftId) {
     if (!this.initialized) {
@@ -290,13 +297,15 @@ async getProduct(productId) {
       const result = await query.execute(this.client);
       
       const nftIds = [];
-      const arrayLength = result.getUint256(0).toNumber();
-      
-      for (let i = 0; i < arrayLength; i++) {
-        nftIds.push(result.getUint256(i + 1).toNumber());
-      }
-
-      return nftIds;
+const arrayLength = result.getUint256(0).toNumber();
+for (let i = 0; i < arrayLength; i++) {
+  const nftId = result.getUint256(i + 1).toNumber();
+  // ✅ Filter out invalid IDs (0 or negative)
+  if (nftId > 0) {
+    nftIds.push(nftId);
+  }
+}
+return nftIds;
 
     } catch (error) {
       console.error('❌ Error querying user NFTs:', error.message);

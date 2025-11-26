@@ -1,14 +1,14 @@
 const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
-  console.log('🔵 AUTH MIDDLEWARE CALLED'); // ✨ ADD
-  console.log('   Headers:', req.headers.authorization); // ✨ ADD
+  //console.log('🔵 AUTH MIDDLEWARE CALLED'); // ✨ ADD
+  //console.log('   Headers:', req.headers.authorization); // ✨ ADD
   
   try {
     const authHeader = req.headers.authorization;
     
     if (!authHeader) {
-      console.log('❌ No auth header'); // ✨ ADD
+      //console.log('❌ No auth header'); // ✨ ADD
       return res.status(401).json({
         success: false,
         message: 'Token d\'authentification manquant',
@@ -19,7 +19,7 @@ const authMiddleware = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     
     if (!token) {
-      console.log('❌ No token after split'); // ✨ ADD
+      //console.log('❌ No token after split'); // ✨ ADD
       return res.status(401).json({
         success: false,
         message: 'Format de token invalide',
@@ -27,9 +27,9 @@ const authMiddleware = (req, res, next) => {
       });
     }
 
-    console.log('🔍 Verifying token...'); // ✨ ADD
+    //console.log('🔍 Verifying token...'); // ✨ ADD
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Token decoded:', decoded); // ✨ ADD
+    //console.log('✅ Token decoded:', decoded); // ✨ ADD
     
     req.user = {
       id: decoded.id || decoded.userId,
@@ -37,7 +37,7 @@ const authMiddleware = (req, res, next) => {
       name: decoded.name
     };
 
-    console.log('✅ req.user set:', req.user); // ✨ ADD
+    //console.log('✅ req.user set:', req.user); // ✨ ADD
 
     next();
   } catch (error) {

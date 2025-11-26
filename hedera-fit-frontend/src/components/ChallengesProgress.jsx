@@ -4,76 +4,45 @@ import './ChallengesProgress.css';
 const ChallengesProgress = ({ token, user }) => {
   const [tab, setTab] = useState('daily');
   const [allChallenges, setAllChallenges] = useState([]);
-  const [userProgress, setUserProgress] = useState([]);
+ 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, [token]);
+  fetchChallenges();
+  // ❌ DISABLED - Polling every 10s causes too many API calls
+  // Users can manually refresh if needed
+  // const interval = setInterval(fetchChallenges, 10000);
+  // return () => clearInterval(interval);
+}, [token]);
 
-  const fetchData = async () => {
-    try {
-      await Promise.all([
-        fetchChallenges(),
-        fetchUserProgress()
-      ]);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      setLoading(false);
-    }
-  };
+  
 
   const fetchChallenges = async () => {
-    const response = await fetch('http://localhost:3000/api/challenges', {
+  try {
+    const response = await fetch('http://localhost:3000/api/challenges/active', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await response.json();
     if (data.success) {
-      setAllChallenges(data.data.challenges || []);
+      setAllChallenges(data.data.all || []);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching challenges:', error);
+  } finally {
+    setLoading(false); // ✅ AJOUTE CECI!
+  }
+};
 
-  const fetchUserProgress = async () => {
-    const response = await fetch('http://localhost:3000/api/challenges/progress', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const data = await response.json();
-    if (data.success) {
-      setUserProgress(data.data || []);
-    }
-  };
+  
 
-  // Group challenges by type
-  const challengesByType = {
-    daily: allChallenges.filter(c => c.type === 'daily_steps'),
-    duration: allChallenges.filter(c => c.type === 'duration_steps'),
-    social: allChallenges.filter(c => c.type === 'social')
-  };
-
-  // Add progress to challenges
-  const enrichedChallenges = challengesByType[tab].map(challenge => {
-    const progress = userProgress.find(p => p.challengeId === challenge.id);
-    return {
-      ...challenge,
-      currentProgress: progress?.progress || 0,
-      isCompleted: progress?.completed || false,
-      isUnlocked: progress?.unlocked || (challenge.level === 1),
-      progressPercent: challenge.target > 0 
-        ? Math.min(100, Math.floor(((progress?.progress || 0) / challenge.target) * 100))
-        : 0
-    };
-  });
+  
 
   // Calculate stats
   const stats = {
-    totalChallenges: allChallenges.length,
-    completedChallenges: userProgress.filter(p => p.completed).length,
-    activeChallenges: userProgress.filter(p => !p.completed && p.progress > 0).length
-  };
-
+  totalChallenges: allChallenges.length,
+  completedChallenges: allChallenges.filter(c => c.isCompleted).length,
+  activeChallenges: allChallenges.filter(c => !c.isCompleted && c.currentProgress > 0).length
+};
   if (loading) {
     return (
       <div className="challenges-progress">
@@ -81,7 +50,15 @@ const ChallengesProgress = ({ token, user }) => {
       </div>
     );
   }
+// Backend already returns enriched challenges with progress!
+const challengesByType = {
+  daily: allChallenges.filter(c => c.type === 'daily_steps'),
+  duration: allChallenges.filter(c => c.type === 'duration_steps'),
+  social: allChallenges.filter(c => c.type === 'social')
+};
 
+// No need to enrich again - backend already did it!
+const enrichedChallenges = challengesByType[tab];
   return (
     <div className="challenges-progress">
       {/* Header with blockchain info */}

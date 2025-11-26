@@ -1,0 +1,70 @@
+﻿[dotenv@17.2.3] injecting env (19) from .env -- tip: ≡ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+
+≡ƒöì Testing NFT Queries for 0.0.7309024
+≡ƒôì Contract: 0.0.7314281
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+1∩╕ÅΓâú Testing getNFTCount()...
+   Γ£à Total NFTs minted: 7
+
+2∩╕ÅΓâú Testing getNFT(6)...
+   ≡ƒôª Raw result bytes: <Buffer 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ... 334 more bytes>
+   ≡ƒôª Trying to parse as individual fields:
+      - ID: 32
+      - Product ID: 6
+      - Owner: 0000000000000000000000000000000000000007
+      - Purchase Date: 7309024
+      - Is Used: true
+
+3∩╕ÅΓâú Testing getNFT(7)...
+   Γ£à NFT #7 exists!
+   ≡ƒôª Raw bytes: <Buffer 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ... 334 more bytes>
+
+4∩╕ÅΓâú Testing getUserNFTs()...
+   ≡ƒöä Converting 0.0.7309024 to EVM: 0x00000000000000000000000000000000006f86e0
+   ≡ƒôª Raw result: <Buffer 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ... 238 more bytes>
+   Γ£à Array length: 32
+   ≡ƒôï Your NFT IDs:
+      - NFT #7
+      - NFT #1
+      - NFT #2
+      - NFT #3
+      - NFT #4
+      - NFT #5
+      - NFT #6
+      - NFT #7
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+      - NFT #0
+
+5∩╕ÅΓâú Testing getProduct(7)...
+   Γ£à Product #7:
+      - Name: Water Bottle
+      - Price: 22 FIT
+      - Stock: 75
+      - Category: equipment
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+Γ£à Test complete!
+

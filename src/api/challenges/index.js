@@ -27,26 +27,39 @@ router.get('/active', authMiddleware, async (req, res) => {
     // Enrich with contract data
     const enriched = [];
     for (const ch of challenges) {
-      try {
-        const progress = await fitnessContract.getChallengeProgress(user.hederaAccountId, ch.id);
-        const completed = await fitnessContract.isChallengeCompleted(user.hederaAccountId, ch.id);
+  // Only query blockchain for level 1 challenges
+  if (ch.level === 1) {
+    try {
+      const progress = await fitnessContract.getChallengeProgress(user.hederaAccountId, ch.id);
+      const completed = await fitnessContract.isChallengeCompleted(user.hederaAccountId, ch.id);
 
-        enriched.push({
-          ...ch,
-          currentProgress: progress,
-          progressPercent: Math.min(100, Math.floor((progress / ch.target) * 100)),
-          isCompleted: completed
-        });
-      } catch (error) {
-        // If contract query fails, use cache
-        enriched.push({
-          ...ch,
-          currentProgress: 0,
-          progressPercent: 0,
-          isCompleted: false
-        });
-      }
+      enriched.push({
+        ...ch,
+        currentProgress: progress,
+        progressPercent: Math.min(100, Math.floor((progress / ch.target) * 100)),
+        isCompleted: completed,
+        isUnlocked: true
+      });
+    } catch (error) {
+      enriched.push({
+        ...ch,
+        currentProgress: 0,
+        progressPercent: 0,
+        isCompleted: false,
+        isUnlocked: false
+      });
     }
+  } else {
+    // Level 2+ locked
+    enriched.push({
+      ...ch,
+      currentProgress: 0,
+      progressPercent: 0,
+      isCompleted: false,
+      isUnlocked: false
+    });
+  }
+}
 
     // Group by type
     const daily = enriched.filter(c => c.type === 'daily_steps');

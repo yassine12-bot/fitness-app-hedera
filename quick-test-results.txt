@@ -1,0 +1,155 @@
+﻿[dotenv@17.2.3] injecting env (19) from .env -- tip: ≡ƒæÑ sync secrets across teammates & machines: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ≡ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+≡ƒöù Initializing MarketplaceContract service...
+Γ£à MarketplaceContract service initialized
+   Contract: 0.0.7314281
+
+≡ƒº¬ Quick Test
+
+1∩╕ÅΓâú Testing getProductCount...
+   Γ£à Product count: 0
+
+2∩╕ÅΓâú Testing getProduct(7)...
+node : Γ¥î Error querying 
+product count: 
+transaction 0.0.5425861@17
+64086412.048607149 failed 
+precheck with status INSUF
+FICIENT_PAYER_BALANCE 
+against node account id 
+0.0.3
+At line:1 char:1
++ node quick-test.js 2>&1 
+| Out-File -FilePath 
+quick-test-results.txt - 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (Γ  
+  ¥î Error query...ccou   
+ nt id 0.0.3:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+Γ¥î Error querying 
+product: transaction 0.0.5
+425861@1764086416.52433936
+7 failed precheck with 
+status INSUFFICIENT_PAYER_
+BALANCE against node 
+account id 0.0.5
+Full error: 
+PrecheckStatusError: 
+transaction 0.0.5425861@17
+64086416.524339367 failed 
+precheck with status INSUF
+FICIENT_PAYER_BALANCE 
+against node account id 
+0.0.5
+    at new 
+PrecheckStatusError (C:\Us
+ers\labri\OneDrive\Desktop
+\fitnessapp\hedera-fit-bac
+kend\node_modules\@hashgra
+ph\sdk\lib\PrecheckStatusE
+rror.cjs:48:5)
+    at ContractCallQuery._
+mapStatusError (C:\Users\l
+abri\OneDrive\Desktop\fitn
+essapp\hedera-fit-backend\
+node_modules\@hashgraph\sd
+k\lib\contract\ContractCal
+lQuery.cjs:231:14)
+    at 
+ContractCallQuery.execute 
+(C:\Users\labri\OneDrive\D
+esktop\fitnessapp\hedera-f
+it-backend\node_modules\@h
+ashgraph\sdk\lib\Executabl
+e.cjs:692:22)
+    at process.processTick
+sAndRejections (node:inter
+nal/process/task_queues:10
+5:5)
+    at async MarketplaceCo
+ntractService.getProduct (
+C:\Users\labri\OneDrive\De
+sktop\fitnessapp\hedera-fi
+t-backend\src\lib\marketpl
+ace-contract.js:141:20)
+    at async quickTest (C:
+\Users\labri\OneDrive\Desk
+top\fitnessapp\hedera-fit-
+backend\quick-test.js:17:2
+5) {
+  status: Status { _code: 
+10 },
+  transactionId: 
+TransactionId {
+    accountId: AccountId {
+      shard: [Long],
+      realm: [Long],
+      num: [Long],
+      aliasKey: null,
+      evmAddress: null,
+      _checksum: null
+    },
+    validStart: Timestamp 
+{ seconds: [Long], nanos: 
+[Long] },
+    scheduled: false,
+    nonce: null
+  },
+  contractFunctionResult: 
+null,
+  nodeId: AccountId {
+    shard: Long { low: 0, 
+high: 0, unsigned: false 
+},
+    realm: Long { low: 0, 
+high: 0, unsigned: false 
+},
+    num: Long { low: 5, 
+high: 0, unsigned: false 
+},
+    aliasKey: null,
+    evmAddress: null,
+    _checksum: null
+  }
+}
+   Γ¥î getProduct returned null
+
+3∩╕ÅΓâú Testing getNFTCount...
+Γ¥î Error querying NFT 
+count: transaction 0.0.542
+5861@1764086412.170392581 
+failed precheck with 
+status INSUFFICIENT_PAYER_
+BALANCE against node 
+account id 0.0.8
+   Γ£à NFT count: 0
+
+4∩╕ÅΓâú Testing getNFT(7)...
+Γ¥î Error querying NFT: 
+transaction 0.0.5425861@17
+64086415.003691388 failed 
+precheck with status INSUF
+FICIENT_PAYER_BALANCE 
+against node account id 
+0.0.9
+   Γ¥î getNFT returned null
+
+5∩╕ÅΓâú Testing getUserNFTs...
+Γ¥î Error querying user 
+NFTs: transaction 0.0.5425
+861@1764086414.950256514 
+failed precheck with 
+status INSUFFICIENT_PAYER_
+BALANCE against node 
+account id 0.0.6
+   Γ£à User has 0 NFTs: 
+
+Γ£à All tests complete!
+

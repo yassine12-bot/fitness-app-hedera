@@ -50,42 +50,42 @@ router.post('/register', async (req, res) => {
     let hederaAccountId = null;
     let hederaPrivateKeyEncrypted = null;
     let walletCreated = false;
-    
+
     try {
       if (!hederaService.client) {
         await hederaService.initialize();
       }
-      
+
       console.log('🔑 Création du wallet Hedera pour le nouvel utilisateur...');
       const newAccount = await hederaService.createAccount();
       hederaAccountId = newAccount.accountId.toString();
-      
+
       // 🔐 Encrypt and store private key
       hederaPrivateKeyEncrypted = encryptPrivateKey(newAccount.privateKey.toString());
-      
+
       walletCreated = true;
       console.log(`✅ Wallet créé: ${hederaAccountId}`);
       console.log(`🔐 Private key encrypted and stored`);
-      
+
       // ✅ Associer automatiquement le FIT Token
       try {
         console.log('🔗 Association du FIT Token au nouveau wallet...');
-        
+
         if (!hederaService.fitTokenId) {
           hederaService.setFitTokenId(process.env.FIT_TOKEN_ID);
         }
-        
+
         await hederaService.associateToken(
           hederaAccountId,
           newAccount.privateKey
         );
-        
+
         console.log('✅ FIT Token associé au wallet!');
       } catch (assocError) {
         console.error('⚠️  Erreur association token:', assocError.message);
         console.log('   → Les tokens devront être associés manuellement plus tard');
       }
-      
+
     } catch (walletError) {
       console.error('⚠️  Erreur création wallet:', walletError.message);
       console.log('   → Compte sera créé sans wallet, il pourra en créer un plus tard');
@@ -124,10 +124,25 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // ✅ Auto-join user to default topics
+    try {
+      const defaultTopics = await db.all('SELECT id FROM topics WHERE creatorId = 1 LIMIT 3');
+      for (const topic of defaultTopics) {
+        await db.run(`
+          INSERT OR IGNORE INTO topic_members (topicId, userId, joinedAt)
+          VALUES (?, ?, datetime('now'))
+        `, [topic.id, userId]);
+      }
+      console.log(`✅ User ${userId} auto-joined to ${defaultTopics.length} default topics`);
+    } catch (topicError) {
+      console.warn('⚠️  Could not auto-join topics:', topicError.message);
+      // Don't block registration if topic join fails
+    }
+
     res.status(201).json({
       success: true,
-      message: walletCreated 
-        ? 'Compte et wallet Hedera créés avec succès! 🎉' 
+      message: walletCreated
+        ? 'Compte et wallet Hedera créés avec succès! 🎉'
         : 'Compte créé! (Wallet Hedera à créer plus tard)',
       token: token,
       user: {
@@ -214,7 +229,36 @@ router.post('/login', async (req, res) => {
       }
     }
 
-    
+    // ✅ Query blockchain for real-time FIT balance on login
+    let realTimeFitBalance = user.fitBalance || 0;
+    if (user.hederaAccountId) {
+      try {
+        const { AccountBalanceQuery } = require('@hashgraph/sdk');
+        const hederaService = require('../lib/hedera');
+
+        if (!hederaService.client) {
+          await hederaService.initialize();
+        }
+
+        if (!hederaService.fitTokenId) {
+          hederaService.setFitTokenId(process.env.FIT_TOKEN_ID);
+        }
+
+        const balance = await new AccountBalanceQuery()
+          .setAccountId(user.hederaAccountId)
+          .execute(hederaService.client);
+
+        const fitBalance = balance.tokens.get(hederaService.fitTokenId);
+        if (fitBalance !== null && fitBalance !== undefined) {
+          realTimeFitBalance = fitBalance.toNumber();
+          console.log(`✅ Login: Real-time FIT balance from blockchain: ${realTimeFitBalance}`);
+        }
+      } catch (balanceError) {
+        console.error('⚠️ Failed to query blockchain balance on login, using cache:', balanceError.message);
+        // Fall back to cached balance
+      }
+    }
+
     res.json({
       success: true,
       message: 'Connexion réussie',
@@ -223,7 +267,7 @@ router.post('/login', async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        fitBalance: user.fitBalance,
+        fitBalance: realTimeFitBalance,
         totalSteps: user.totalSteps,
         hederaAccountId: user.hederaAccountId,
         hasWallet: !!user.hederaAccountId,
@@ -248,7 +292,7 @@ router.get('/me', async (req, res) => {
   try {
     // Vérifier le token
     const token = req.headers.authorization?.split(' ')[1];
-    
+
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -258,7 +302,7 @@ router.get('/me', async (req, res) => {
 
     // Décoder le token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Récupérer les données utilisateur
     const user = await db.get(
       'SELECT id, name, email, fitBalance, totalSteps, hederaAccountId, isAdmin, createdAt FROM users WHERE id = ?',
@@ -286,13 +330,43 @@ router.get('/me', async (req, res) => {
       isAdminRaw: user.isAdmin || 0
     });
 
+    // ✅ Query blockchain for real-time FIT balance
+    let realTimeFitBalance = user.fitBalance || 0;
+    if (user.hederaAccountId) {
+      try {
+        const { AccountBalanceQuery, TokenId } = require('@hashgraph/sdk');
+        const hederaService = require('../lib/hedera');
+
+        if (!hederaService.client) {
+          await hederaService.initialize();
+        }
+
+        if (!hederaService.fitTokenId) {
+          hederaService.setFitTokenId(process.env.FIT_TOKEN_ID);
+        }
+
+        const balance = await new AccountBalanceQuery()
+          .setAccountId(user.hederaAccountId)
+          .execute(hederaService.client);
+
+        const fitBalance = balance.tokens.get(hederaService.fitTokenId);
+        if (fitBalance !== null && fitBalance !== undefined) {
+          realTimeFitBalance = fitBalance.toNumber();
+          console.log(`✅ Real-time FIT balance from blockchain: ${realTimeFitBalance}`);
+        }
+      } catch (balanceError) {
+        console.error('⚠️ Failed to query blockchain balance, using cache:', balanceError.message);
+        // Fall back to cached balance
+      }
+    }
+
     res.json({
       success: true,
       data: {
         id: user.id,
         name: user.name,
         email: user.email,
-        fitBalance: user.fitBalance || 0,
+        fitBalance: realTimeFitBalance,
         totalSteps: user.totalSteps || 0,
         hederaAccountId: user.hederaAccountId,
         hasWallet: !!user.hederaAccountId,
@@ -304,14 +378,14 @@ router.get('/me', async (req, res) => {
 
   } catch (error) {
     console.error('Get profile error:', error);
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
         message: 'Token invalide'
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération du profil',
@@ -326,7 +400,7 @@ router.get('/me', async (req, res) => {
 router.post('/create-wallet', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    
+
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -335,7 +409,7 @@ router.post('/create-wallet', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Vérifier si l'user a déjà un wallet
     const user = await db.get(
       'SELECT hederaAccountId FROM users WHERE id = ?',
@@ -358,23 +432,23 @@ router.post('/create-wallet', async (req, res) => {
     console.log(`🔑 Création du wallet Hedera pour user ${decoded.id}...`);
     const newAccount = await hederaService.createAccount();
     const hederaAccountId = newAccount.accountId.toString();
-    
+
     // 🔐 Encrypt and store private key
     const hederaPrivateKeyEncrypted = encryptPrivateKey(newAccount.privateKey.toString());
 
     // ✅ Associer automatiquement le FIT Token
     try {
       console.log('🔗 Association du FIT Token au nouveau wallet...');
-      
+
       if (!hederaService.fitTokenId) {
         hederaService.setFitTokenId(process.env.FIT_TOKEN_ID);
       }
-      
+
       await hederaService.associateToken(
         hederaAccountId,
         newAccount.privateKey
       );
-      
+
       console.log('✅ FIT Token associé au wallet!');
     } catch (assocError) {
       console.error('⚠️  Erreur association token:', assocError.message);

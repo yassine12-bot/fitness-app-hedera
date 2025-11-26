@@ -31,9 +31,9 @@ function App() {
       const response = await fetch('http://localhost:3000/auth/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         setUser(data.data);
       } else {
@@ -49,18 +49,19 @@ function App() {
 
   const refreshBalance = async () => {
     if (!token) return;
-    
+
     try {
       const response = await fetch('http://localhost:3000/auth/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         setUser(prevUser => ({
           ...prevUser,
-          fitBalance: data.data.fitBalance
+          fitBalance: data.data.fitBalance,
+          totalSteps: data.data.totalSteps  // ✅ FIX: Also update totalSteps!
         }));
       }
     } catch (error) {
@@ -156,8 +157,8 @@ function App() {
 
       <main className="app-main">
         {currentTab === 'simulator' && (
-          <StepSimulator 
-            token={token} 
+          <StepSimulator
+            token={token}
             user={user}
             onStepsAdded={refreshBalance}
           />
@@ -166,8 +167,8 @@ function App() {
           <ChallengesProgress token={token} user={user} />
         )}
         {currentTab === 'marketplace' && (
-          <Marketplace 
-            token={token} 
+          <Marketplace
+            token={token}
             user={user}
             onBalanceChange={refreshBalance}
           />
@@ -213,7 +214,7 @@ const AuthPage = ({ isLogin, setIsLogin, setToken, setUser }) => {
 
     try {
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
-      const body = isLogin 
+      const body = isLogin
         ? { email: formData.email, password: formData.password }
         : formData;
 

@@ -283,14 +283,14 @@ await new Promise(resolve => setTimeout(resolve, 5000));
     // ====================================================
     // Sync cache (will also sync product stock)
     // ====================================================
-    await cacheSync.onNFTPurchased(
-      req.user.id,
-      user.hederaAccountId,
-      nftId,
-      productId,
-      totalCost,
-      transactionId
-    );
+    //await cacheSync.onNFTPurchased(
+    //  req.user.id,
+    //  user.hederaAccountId,
+    //  nftId,
+    //  productId,
+    //  totalCost,
+    //  transactionId
+    //);
     
     // Close client
     if (userClient) {
@@ -347,36 +347,56 @@ await new Promise(resolve => setTimeout(resolve, 5000));
  * GET /api/marketplace/purchases
  */
 router.get('/purchases', authMiddleware, async (req, res) => {
-   console.log('🔍 DEBUG /purchases - req.user:', req.user); // ✨ ADD THIS
-  
   try {
-    const purchases = await db.all(`
-      SELECT 
-        p.*,
-        pr.name as productName,
-        pr.category,
-        pr.imageUrl
-      FROM purchases p
-      JOIN products pr ON p.productId = pr.id
-      WHERE p.userId = ?
-      ORDER BY p.createdAt DESC
-      LIMIT 50
-    `, [req.user.id]);
-    
-    res.json({
-      success: true,
-      data: purchases
-    });
-    
+    const user = await db.get(
+      'SELECT hederaAccountId FROM users WHERE id = ?',
+      [req.user.id]
+    );
+
+    if (!user || !user.hederaAccountId) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Query blockchain for NFTs
+    const nftIds = await marketplaceContract.getUserNFTs(user.hederaAccountId);
+    const purchases = [];
+
+    for (const nftId of nftIds) {
+      try {
+        const nft = await marketplaceContract.getNFT(nftId);
+        if (!nft) {
+          console.log(`⚠️ Skipping NFT #${nftId} - query returned null`);
+          continue;
+        }
+        
+        const product = await marketplaceContract.getProduct(nft.productId);
+        if (!product) {
+          console.log(`⚠️ Skipping product #${nft.productId} - query returned null`);
+          continue;
+        }
+
+        purchases.push({
+          id: nftId,
+          nftId: nftId,
+          productName: product.name,
+          category: product.category,
+          imageUrl: product.imageUrl,
+          totalCost: product.priceTokens,
+          qrCode: `NFT-${nftId}`,
+          isUsed: nft.isUsed,
+          createdAt: new Date(nft.purchaseDate * 1000).toISOString()
+        });
+      } catch (err) {
+        console.error(`❌ Error processing NFT #${nftId}:`, err.message);
+      }
+    }
+
+    res.json({ success: true, data: purchases });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des achats',
-      error: error.message
-    });
+    console.error('❌ Error fetching purchases:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
-
 /**
  * GET /api/marketplace/categories
  */
