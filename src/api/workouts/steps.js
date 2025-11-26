@@ -3,14 +3,12 @@ const router = express.Router();
 const db = require('../../lib/db');
 const authMiddleware = require('../../auth/middleware');
 const fitnessContract = require('../../lib/fitness-contract');
-const cacheSync = require('../../lib/cache-sync');
+const activityLogger = require('../../lib/activity-logger');
 
 /**
  * POST /api/workouts/steps
- * Enregistrer manuellement des pas (avec smart contract)
- * 
- * MODIFIÉ: Appelle FitnessContract au lieu d'écrire directement dans SQLite
- * Cache sync automatique via cache-sync.js
+ * NEW ROUTE: For Step Simulator frontend
+ * Log steps to smart contract (matches frontend expectations)
  */
 router.post('/steps', authMiddleware, async (req, res) => {
   try {
@@ -19,153 +17,339 @@ router.post('/steps', authMiddleware, async (req, res) => {
     if (!steps || steps <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Nombre de pas invalide'
+        message: 'Steps must be greater than 0'
       });
     }
 
-    // ====================================================
-    // NOUVEAU: Récupérer le compte Hedera de l'utilisateur
-    // ====================================================
-    const user = await db.get(
-      'SELECT hederaAccountId FROM users WHERE id = ?',
-      [req.user.id]
-    );
+    const user = await db.get('SELECT hederaAccountId FROM users WHERE id = ?', [req.user.id]);
 
     if (!user.hederaAccountId) {
       return res.status(400).json({
         success: false,
-        message: 'Aucun wallet Hedera associé. Créez un wallet d\'abord.'
+        message: 'No Hedera wallet found'
       });
     }
 
-    // ====================================================
-    // NOUVEAU: Appeler le smart contract
-    // ====================================================
-    console.log(`📊 Calling FitnessContract.updateSteps(${user.hederaAccountId}, ${steps})`);
-    
-    const contractResult = await fitnessContract.updateSteps(
-      user.hederaAccountId,
-      steps
+    // Log steps to smart contract
+    const contractResult = await fitnessContract.updateSteps(user.hederaAccountId, steps);
+    const txId = contractResult.transactionId;
+
+    console.log(`✅ Steps logged to blockchain: ${steps} steps`);
+
+    // Update local DB
+    await db.run(
+      'UPDATE users SET totalSteps = totalSteps + ? WHERE id = ?',
+      [steps, req.user.id]
     );
 
-    if (!contractResult.success) {
-      throw new Error('Contract call failed');
+    // Check all challenges for completion
+    const challenges = await db.all('SELECT * FROM challenges WHERE isActive = 1');
+    const completedChallenges = [];
+
+    for (const challenge of challenges) {
+      const isCompleted = await fitnessContract.isChallengeCompleted(
+        user.hederaAccountId,
+        challenge.id
+      );
+
+      if (isCompleted) {
+        // ✅ RACE CONDITION FIX: Check AND insert in same operation
+        try {
+          // Try to insert immediately - UNIQUE constraint will prevent duplicates
+          await db.run(`
+            INSERT INTO challenge_completions (
+              userId, challengeId, challengeTitle, challengeLevel, reward, hederaTxId, completedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          `, [req.user.id, challenge.id, challenge.name, challenge.level || 1, challenge.reward, txId]);
+
+          // ✅ INSERT succeeded = First time logging this challenge
+          console.log(`🆕 First time completing challenge ${challenge.id}, logging to topic...`);
+
+          // NOW log to Hedera Topic (only if insert succeeded)
+          const logResult = await activityLogger.logChallengeCompleted(
+            user.hederaAccountId,
+            challenge.id,
+            challenge.name,
+            challenge.reward,
+            txId
+          );
+
+          if (logResult && logResult.success) {
+            completedChallenges.push({
+              id: challenge.id,
+              name: challenge.name,
+              reward: challenge.reward
+            });
+            console.log(`📝 Challenge ${challenge.id} "${challenge.name}" logged to registry topic`);
+          } else {
+            // Logging failed - remove from database so we can retry
+            console.error(`❌ Failed to log to topic, removing from DB to retry later`);
+            await db.run(
+              'DELETE FROM challenge_completions WHERE userId = ? AND challengeId = ?',
+              [req.user.id, challenge.id]
+            );
+          }
+
+        } catch (dbError) {
+          // UNIQUE constraint error = Another request already logged this
+          if (dbError.code === 'SQLITE_CONSTRAINT') {
+            console.log(`⏭️ Challenge ${challenge.id} already logged by concurrent request, skipping`);
+            // This is OK - don't log to topic, don't add to response
+          } else {
+            // Unexpected database error
+            console.error(`❌ Database error for challenge ${challenge.id}:`, dbError.message);
+          }
+        }
+      }
     }
 
-    console.log(`✅ Contract updated! TX: ${contractResult.transactionId}`);
-
-    // ====================================================
-    // NOUVEAU: Cache sync manuel (au lieu d'attendre listener)
-    // ====================================================
-    await cacheSync.onWorkoutLogged(
-      req.user.id,
-      user.hederaAccountId,
-      steps,
-      contractResult.transactionId
+    // Get updated totals
+    const updatedUser = await db.get(
+      'SELECT totalSteps, fitBalance FROM users WHERE id = ?',
+      [req.user.id]
     );
 
-    // ====================================================
-    // Réponse (format identique pour compatibilité frontend)
-    // ====================================================
-    res.status(201).json({
+    // Return format expected by StepSimulator.jsx
+    res.json({
       success: true,
-      message: 'Activité enregistrée on-chain! 🎉',
+      message: 'Steps logged successfully',
       data: {
         steps,
         distance: distance || 0,
         calories: calories || 0,
+        totalSteps: updatedUser.totalSteps,
+        fitBalance: updatedUser.fitBalance,
+        completedChallenges,
         blockchain: {
-          transactionId: contractResult.transactionId,
-          explorerUrl: `https://hashscan.io/testnet/transaction/${contractResult.transactionId}`
+          transactionId: txId,
+          explorerUrl: `https://hashscan.io/testnet/transaction/${txId}`
         }
       }
     });
 
   } catch (error) {
-    console.error('❌ Error recording workout:', error);
+    console.error('❌ Error logging steps:', error);
     res.status(500).json({
       success: false,
-      message: 'Erreur lors de l\'enregistrement',
       error: error.message
     });
   }
 });
 
 /**
- * GET /api/workouts/history
- * Historique des workouts
- * 
- * INCHANGÉ: Lit depuis cache SQLite
+ * POST /api/workouts/log-steps
+ * EXISTING ROUTE: Keep for backward compatibility
  */
-router.get('/history', authMiddleware, async (req, res) => {
+router.post('/log-steps', authMiddleware, async (req, res) => {
   try {
-    const { limit = 30, page = 1 } = req.query;
-    const offset = (page - 1) * limit;
+    const { steps } = req.body;
 
-    const workouts = await db.all(`
-      SELECT * FROM workouts
-      WHERE userId = ?
-      ORDER BY workoutDate DESC
-      LIMIT ? OFFSET ?
-    `, [req.user.id, parseInt(limit), parseInt(offset)]);
+    if (!steps || steps <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Steps must be greater than 0'
+      });
+    }
 
-    // Stats totales
-    const stats = await db.get(`
-      SELECT 
-        SUM(steps) as totalSteps,
-        SUM(distance) as totalDistance,
-        SUM(calories) as totalCalories,
-        COUNT(*) as totalWorkouts
-      FROM workouts
-      WHERE userId = ?
-    `, [req.user.id]);
+    const user = await db.get('SELECT hederaAccountId FROM users WHERE id = ?', [req.user.id]);
+
+    if (!user.hederaAccountId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No Hedera wallet found'
+      });
+    }
+
+    // Log steps to smart contract
+    const contractResult = await fitnessContract.updateSteps(user.hederaAccountId, steps);
+    const txId = contractResult.transactionId;
+
+    console.log(`✅ Steps logged to blockchain: ${steps} steps`);
+
+    // Check all challenges for completion
+    const challenges = await db.all('SELECT * FROM challenges WHERE isActive = 1');
+    const completedChallenges = [];
+
+    for (const challenge of challenges) {
+      const isCompleted = await fitnessContract.isChallengeCompleted(
+        user.hederaAccountId,
+        challenge.id
+      );
+
+      if (isCompleted) {
+        // ✅ RACE CONDITION FIX: Insert first, then log
+        try {
+          await db.run(`
+            INSERT INTO challenge_completions (
+              userId, challengeId, challengeTitle, challengeLevel, reward, hederaTxId, completedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          `, [req.user.id, challenge.id, challenge.name, challenge.level || 1, challenge.reward, txId]);
+
+          console.log(`🆕 First time completing challenge ${challenge.id}, logging to topic...`);
+
+          const logResult = await activityLogger.logChallengeCompleted(
+            user.hederaAccountId,
+            challenge.id,
+            challenge.name,
+            challenge.reward,
+            txId
+          );
+
+          if (logResult && logResult.success) {
+            completedChallenges.push({
+              id: challenge.id,
+              name: challenge.name,
+              reward: challenge.reward
+            });
+            console.log(`📝 Challenge ${challenge.id} "${challenge.name}" logged to registry topic`);
+          } else {
+            console.error(`❌ Failed to log to topic, removing from DB to retry later`);
+            await db.run(
+              'DELETE FROM challenge_completions WHERE userId = ? AND challengeId = ?',
+              [req.user.id, challenge.id]
+            );
+          }
+
+        } catch (dbError) {
+          if (dbError.code === 'SQLITE_CONSTRAINT') {
+            console.log(`⏭️ Challenge ${challenge.id} already logged by concurrent request, skipping`);
+          } else {
+            console.error(`❌ Database error for challenge ${challenge.id}:`, dbError.message);
+          }
+        }
+      }
+    }
 
     res.json({
       success: true,
+      message: 'Steps logged successfully',
       data: {
-        workouts,
-        stats
+        steps,
+        transactionId: txId,
+        completedChallenges
       }
     });
 
   } catch (error) {
+    console.error('❌ Error logging steps:', error);
     res.status(500).json({
       success: false,
-      message: 'Erreur lors de la récupération',
       error: error.message
     });
   }
 });
 
 /**
- * GET /api/workouts/today
- * Statistiques du jour
- * 
- * INCHANGÉ: Lit depuis cache SQLite
+ * POST /api/workouts/manual-steps
+ * EXISTING ROUTE: Keep for backward compatibility
  */
-router.get('/today', authMiddleware, async (req, res) => {
+router.post('/manual-steps', authMiddleware, async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const { steps = 50 } = req.body;
 
-    const todayStats = await db.get(`
-      SELECT 
-        SUM(steps) as steps,
-        SUM(distance) as distance,
-        SUM(calories) as calories
-      FROM workouts
-      WHERE userId = ?
-      AND DATE(workoutDate) = ?
-    `, [req.user.id, today]);
+    if (steps <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Steps must be greater than 0'
+      });
+    }
+
+    const user = await db.get('SELECT hederaAccountId, totalSteps, fitBalance FROM users WHERE id = ?', [req.user.id]);
+
+    if (!user.hederaAccountId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No Hedera wallet found'
+      });
+    }
+
+    // Log steps to smart contract
+    const contractResult = await fitnessContract.updateSteps(user.hederaAccountId, steps);
+    const txId = contractResult.transactionId;
+
+    console.log(`✅ Manual steps logged to blockchain: ${steps} steps`);
+
+    // Update local DB
+    await db.run(
+      'UPDATE users SET totalSteps = totalSteps + ? WHERE id = ?',
+      [steps, req.user.id]
+    );
+
+    // Check challenges for completion
+    const challenges = await db.all('SELECT * FROM challenges WHERE isActive = 1');
+    const completedChallenges = [];
+
+    for (const challenge of challenges) {
+      const isCompleted = await fitnessContract.isChallengeCompleted(
+        user.hederaAccountId,
+        challenge.id
+      );
+
+      if (isCompleted) {
+        // ✅ RACE CONDITION FIX: Insert first, then log
+        try {
+          await db.run(`
+            INSERT INTO challenge_completions (
+              userId, challengeId, challengeTitle, challengeLevel, reward, hederaTxId, completedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          `, [req.user.id, challenge.id, challenge.name, challenge.level || 1, challenge.reward, txId]);
+
+          console.log(`🆕 First time completing challenge ${challenge.id}, logging to topic...`);
+
+          const logResult = await activityLogger.logChallengeCompleted(
+            user.hederaAccountId,
+            challenge.id,
+            challenge.name,
+            challenge.reward,
+            txId
+          );
+
+          if (logResult && logResult.success) {
+            completedChallenges.push({
+              id: challenge.id,
+              name: challenge.name,
+              reward: challenge.reward
+            });
+            console.log(`📝 Challenge ${challenge.id} "${challenge.name}" logged to registry topic`);
+          } else {
+            console.error(`❌ Failed to log to topic, removing from DB to retry later`);
+            await db.run(
+              'DELETE FROM challenge_completions WHERE userId = ? AND challengeId = ?',
+              [req.user.id, challenge.id]
+            );
+          }
+
+        } catch (dbError) {
+          if (dbError.code === 'SQLITE_CONSTRAINT') {
+            console.log(`⏭️ Challenge ${challenge.id} already logged by concurrent request, skipping`);
+          } else {
+            console.error(`❌ Database error for challenge ${challenge.id}:`, dbError.message);
+          }
+        }
+      }
+    }
+
+    // Get updated totals
+    const updatedUser = await db.get(
+      'SELECT totalSteps, fitBalance FROM users WHERE id = ?',
+      [req.user.id]
+    );
 
     res.json({
       success: true,
-      data: todayStats || { steps: 0, distance: 0, calories: 0 }
+      message: `+${steps} pas ajoutés! 👟`,
+      data: {
+        stepsAdded: steps,
+        totalSteps: updatedUser.totalSteps,
+        fitBalance: updatedUser.fitBalance,
+        completedChallenges
+      }
     });
 
   } catch (error) {
+    console.error('❌ Error adding manual steps:', error);
     res.status(500).json({
       success: false,
-      message: 'Erreur',
       error: error.message
     });
   }

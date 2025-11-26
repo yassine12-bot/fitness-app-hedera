@@ -29,12 +29,13 @@ app.use('/auth', authRoutes);
 const postsRoutes = require('./api/community/posts');
 const commentsRoutes = require('./api/community/comments');
 const likesRoutes = require('./api/community/likes');
-const topicsRoutes = require('./api/community/topics');
+const hederaTopicsRoutes = require('./api/community/hedera-topics');
+app.use('/api/topics', hederaTopicsRoutes);
 const badgesRoutes = require('./api/community/badges');
 app.use('/api/posts', postsRoutes);
 app.use('/api/comments', commentsRoutes);
 app.use('/api/likes', likesRoutes);
-app.use('/api/topics', topicsRoutes);
+
 app.use('/api/badges', badgesRoutes);
 
 // Users & Wallet
@@ -56,9 +57,8 @@ const shoesRoutes = require('./api/shoes/sync');
 app.use('/api/shoes', shoesRoutes);
 
 // Workouts
-const workoutsRoutes = require('./api/workouts/steps');
-app.use('/api/workouts', workoutsRoutes);
-
+const stepsRoutes = require('./api/workouts/steps');
+app.use('/api/workouts', stepsRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({

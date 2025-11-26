@@ -260,6 +260,16 @@ await new Promise(resolve => setTimeout(resolve, 5000));
     console.log('🔍 Querying contract for NFT ID...');
     const nftId = await marketplaceContract.getNFTCount();
     console.log(`✅ NFT ID extracted: ${nftId}`);
+    // 📝 LOG PURCHASE TO REGISTRY TOPIC
+const activityLogger = require('../../lib/activity-logger');
+await activityLogger.logPurchase(
+  user.hederaAccountId,
+  productId,
+  product.name,
+  totalCost,
+  transactionId
+);
+console.log(`📝 Purchase logged to registry topic`);
     
     // ====================================================
     // ✨ NEW: Generate QR code with full NFT data

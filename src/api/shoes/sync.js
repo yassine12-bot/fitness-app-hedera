@@ -150,14 +150,14 @@ if (challengeResult.data.completedChallenges?.length > 0) {
     }
 
     // ================== Logger l'activité HCS ==================
-    if (reward > 0) {
-      await activityLogger.logSync(
-        user.hederaAccountId || `user-${req.user.id}`,
-        steps,
-        reward,
-        user.hederaAccountId ? (hederaTransferred ? 'success' : 'failed') : 'no_wallet'
-      );
-    }
+    // TOUJOURS logger, même si reward = 0
+await activityLogger.logSync(
+  user.hederaAccountId || `user-${req.user.id}`,
+  steps,
+  reward,
+  user.hederaAccountId ? (hederaTransferred ? 'success' : 'failed') : 'no_wallet'
+);
+
 
     // Récupérer le nouveau balance et totalSteps
     const updatedUser = await db.get(
